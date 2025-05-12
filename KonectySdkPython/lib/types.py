@@ -1,6 +1,8 @@
+import json
 import re
 from datetime import datetime
-from typing import Any, Optional, Self
+from decimal import Decimal
+from typing import Any, Dict, List, Optional, Self
 
 from pydantic import BaseModel, Field
 from pydantic.json_schema import JsonSchemaValue
@@ -168,12 +170,98 @@ class KonectyUser(BaseModel):
 class KonectyBaseModel(BaseModel):
     """Modelo base para documentos do Konecty."""
 
-    id: str = Field(alias="_id")
-    created_at: KonectyDateTime = Field(alias="_createdAt")
-    created_by: KonectyUser = Field(alias="_createdBy")
-    updated_at: KonectyDateTime = Field(alias="_updatedAt")
-    updated_by: KonectyUser = Field(alias="_updatedBy")
-    user: list[KonectyUser] = Field(alias="_user")
+    class UserRef(BaseModel):
+        id: Optional[str] = Field(None, alias="_id")
+        name: Optional[str] = None
+        group: Optional[dict] = None
+        active: Optional[bool] = None
+
+    id: Optional[str] = Field(None, alias="_id")
+    code: Optional[int] = None
+    created_at: Optional[datetime] = Field(None, alias="_createdAt")
+    created_by: Optional[UserRef] = Field(None, alias="_createdBy")
+    updated_at: Optional[datetime] = Field(None, alias="_updatedAt")
+    updated_by: Optional[UserRef] = Field(None, alias="_updatedBy")
+    users: Optional[List[UserRef]] = Field(None, alias="_user")
+
+    model_config = {
+        "populate_by_name": True,
+        "json_encoders": {
+            datetime: lambda v: json.dumps({"$date": v.isoformat()}),
+            Decimal: lambda v: str(v),
+        },
+        "extra": "allow",
+    }
+
+    @classmethod
+    def from_json(cls, json_str: str) -> Self:
+        """Cria uma instância do modelo a partir de uma string JSON.
+
+        Args:
+            json_str: String JSON válida representando o objeto
+
+        Returns:
+            Uma instância do modelo
+
+        Raises:
+            ValueError: Se o JSON for inválido
+            ValidationError: Se os dados não corresponderem ao modelo
+        """
+        try:
+            data = json.loads(json_str)
+            return cls.from_dict(data)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"JSON inválido: {str(e)}")
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Cria uma instância do modelo a partir de um dicionário.
+
+        Args:
+            data: Dicionário com os dados do objeto
+
+        Returns:
+            Uma instância do modelo
+
+        Raises:
+            ValidationError: Se os dados não corresponderem ao modelo
+        """
+        return cls.model_validate(data)
+
+    def to_json(self, **kwargs) -> str:
+        """Converte o modelo para uma string JSON.
+
+        Args:
+            **kwargs: Argumentos adicionais para json.dumps
+
+        Returns:
+            String JSON representando o objeto
+        """
+        return json.dumps(self.to_dict(), **kwargs)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Converte o modelo para um dicionário.
+
+        Returns:
+            Dicionário representando o objeto
+        """
+        return self.model_dump(by_alias=True)
+
+    def to_update_dict(self) -> Dict[str, Any]:
+        """Converte o modelo para um dicionário de atualização.
+
+        Returns:
+            Dicionário representando o objeto
+        """
+        return {"_id": self.id, "_updatedAt": self.updated_at or datetime.now()}
+
+    def extend(self, data: Dict[str, Any]):
+        """Extende esse objeto, adcionando os dados recebidos"""
+        field_names = list(self.model_fields.keys())
+
+        for key, value in data.items():
+            if key in field_names:
+                setattr(self, key, value)
 
 
 class KonectyLabel(BaseModel):

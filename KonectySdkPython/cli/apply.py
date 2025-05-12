@@ -120,7 +120,7 @@ async def apply_document(
         doc_data = load_json_file(doc_files["document"][0])
         if doc_data:
             existing_doc = collection.find_one(
-                {"name": doc_name, "type": {"$in": ["composite", "document"]}}
+                {"_id": doc_data["_id"], "type": {"$in": ["composite", "document"]}}
             )
 
             if existing_doc and is_equal_documents(doc_data, existing_doc):
@@ -128,16 +128,18 @@ async def apply_document(
             else:
                 if not dry_run:
                     try:
-                        collection.replace_one(
+                        collection.update_one(
                             {
-                                "name": doc_name,
+                                "_id": doc_data["_id"],
                                 "type": {"$in": ["composite", "document"]},
                             },
-                            doc_data,
+                            {"$set": doc_data},
                             upsert=True,
                         )
                         applied.append(f"✓ {doc_name} (document)")
                     except Exception as error:
+                        print(doc_data["_id"], f"{doc_name} (document)")
+                        print(error)
                         errors.append(f"✗ {doc_name} (document): {str(error)}")
                 else:
                     applied.append(f"✓ {doc_name} (document) [dry-run]")
@@ -162,17 +164,23 @@ async def apply_document(
                 else:
                     if not dry_run:
                         try:
-                            collection.replace_one(
+                            collection.update_one(
                                 {
                                     "name": data["name"],
                                     "type": type_name,
                                     "document": doc_name,
                                 },
-                                data,
+                                {"$set": data},
                                 upsert=True,
                             )
                             applied.append(f"✓ {doc_name}/{type_name}/{data['name']}")
                         except Exception as error:
+                            print(
+                                data["_id"],
+                                data["name"],
+                                f"{doc_name}/{type_name}/{data['name']}",
+                            )
+                            print(error)
                             errors.append(
                                 f"✗ {doc_name}/{type_name}/{data['name']}: {str(error)}"
                             )
@@ -544,9 +552,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
-    main()
-    main()
-    main()
-    main()
     main()

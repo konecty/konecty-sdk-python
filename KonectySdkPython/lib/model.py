@@ -3,7 +3,14 @@ from typing import Any, Dict, List, Optional, Type, TypeVar, cast
 from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo
 
-from konecty.types import Address, KonectyDateTime, KonectyEmail, KonectyLookup, KonectyPersonName, KonectyPhone
+from .types import (
+    Address,
+    KonectyDateTime,
+    KonectyEmail,
+    KonectyLookup,
+    KonectyPersonName,
+    KonectyPhone,
+)
 
 T = TypeVar("T")
 ModelType = TypeVar("ModelType", bound=BaseModel)
@@ -47,7 +54,9 @@ class KonectyModelGenerator:
             if field.get("minSelected", 1) > 1 or field.get("maxSelected", 1) > 1:
                 current_type = List[base_type]  # type: ignore
 
-            is_required = field.get("isRequired", False) or field.get("minSelected", 0) > 0
+            is_required = (
+                field.get("isRequired", False) or field.get("minSelected", 0) > 0
+            )
 
             if not is_required and "defaultValue" not in field:
                 current_type = Optional[base_type]  # type: ignore
@@ -63,7 +72,10 @@ class KonectyModelGenerator:
             if not is_required and "defaultValue" not in field:
                 field_params["default"] = None
 
-            fields[self._clean_name_for_pydantic(field_name)] = (current_type, Field(**field_params))
+            fields[self._clean_name_for_pydantic(field_name)] = (
+                current_type,
+                Field(**field_params),
+            )
 
         model_name = self.schema["name"]
         return create_model(model_name, **fields)
