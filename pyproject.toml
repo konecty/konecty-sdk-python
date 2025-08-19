@@ -1,6 +1,6 @@
 [project]
 name = "konecty_sdk_python"
-version = "1.0.5"
+version = "1.0.6"
 description = "Konecty SDK Python"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,7 +33,7 @@ dependencies = [
 ]
 
 [project.scripts]
-konecty-cli = "cli:main"
+konecty-cli = "KonectySdkPython.cli:main"
 
 [build-system]
 requires = ["hatchling"]

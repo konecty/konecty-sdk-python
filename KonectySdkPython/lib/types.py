@@ -154,6 +154,9 @@ class Address(BaseModel):
         None, description="Informações complementares do endereço."
     )
     country: str | None = Field(None, description="País.")
+    geo_location: tuple[float, float] | None = Field(
+        None, description="Localização geográfica do endereço."
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(by_alias=True)

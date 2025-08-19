@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="konecty_sdk_python",
-    version="1.0.5",
+    version="1.0.6",
     packages=find_packages(),
     package_dir={"": "KonectySdkPython"},
     long_description=long_description,
@@ -24,7 +24,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "konecty-cli=cli.main:main",
+            "konecty-cli=KonectySdkPython.cli:main",
         ],
     },
 )
