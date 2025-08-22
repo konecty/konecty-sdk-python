@@ -67,7 +67,7 @@ class KonectySerializationError(KonectyError):
 def json_serial(obj: Any) -> str:
     """Serializa objetos para JSON."""
     if isinstance(obj, datetime):
-        return obj.isoformat()
+        return {"$date": obj.isoformat()}
     raise KonectySerializationError()
 
 

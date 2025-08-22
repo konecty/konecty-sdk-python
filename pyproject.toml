@@ -1,6 +1,6 @@
 [project]
 name = "konecty_sdk_python"
-version = "1.0.6"
+version = "1.0.7"
 description = "Konecty SDK Python"
 readme = "README.md"
 requires-python = ">=3.11"
