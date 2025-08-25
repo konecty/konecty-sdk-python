@@ -392,3 +392,23 @@ class KonectyPersonName(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(by_alias=True)
+
+
+class KonectyUpdateId(BaseModel):
+    _id: str = Field(alias="_id")
+    _updatedAt: KonectyDateTime = Field(alias="_updatedAt")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        id = data.get("_id")
+        updatedAt = data.get("_updatedAt")
+        if id is None or updatedAt is None:
+            raise ValueError("Invalid value for KonectyUpdateIds")
+        return cls(id=id, updatedAt=KonectyDateTime.from_any(updatedAt))
+
+    @classmethod
+    def from_list(cls, data: list[dict[str, Any]]) -> list[Self]:
+        return [cls.from_dict(item) for item in data]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"_id": self._id, "_updatedAt": self._updatedAt.to_json()}

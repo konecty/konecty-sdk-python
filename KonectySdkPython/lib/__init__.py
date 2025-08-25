@@ -15,6 +15,7 @@ from .types import (
     KonectyLookup,
     KonectyPersonName,
     KonectyPhone,
+    KonectyUpdateId,
     KonectyUser,
 )
 
@@ -38,4 +39,5 @@ __all__ = [
     "KonectyFilter",
     "KonectyFindParams",
     "KonectyDict",
+    "KonectyUpdateId",
 ]

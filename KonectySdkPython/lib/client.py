@@ -9,7 +9,7 @@ import aiohttp
 
 from .file_manager import FileManager
 from .filters import KonectyFilter, KonectyFindParams
-from .types import KonectyDateTime
+from .types import KonectyDateTime, KonectyUpdateId
 
 # Configura o logger do urllib3 para mostrar apenas erros
 logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
@@ -216,6 +216,27 @@ class KonectyClient:
                 errors = result.get("errors", [])
                 raise KonectyAPIError(errors)
             return result.get("data", [None])[0]
+
+    async def update(
+        self, module: str, ids: list[KonectyUpdateId], data: KonectyDict
+    ) -> list[KonectyDict]:
+        endpoint = f"/rest/data/{module}"
+        cleaned_data = {
+            k: v for k, v in data.items() if k not in KONECTY_UPDATE_IGNORE_FIELDS
+        }
+        payload = {
+            "ids": [id.to_dict() for id in ids],
+            "data": json.loads(json.dumps(cleaned_data, default=json_serial)),
+        }
+        async with (
+            aiohttp.ClientSession(base_url=self.base_url) as session,
+            session.put(endpoint, headers=self.headers, json=payload) as response,
+        ):
+            result = await response.json()
+            if not result.get("success", False):
+                errors = result.get("errors", [])
+                raise KonectyAPIError(errors)
+            return result.get("data", [])
 
     async def delete_one(
         self, module: str, id: str, updatedAt: datetime
