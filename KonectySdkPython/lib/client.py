@@ -302,6 +302,58 @@ class KonectyClient:
             return None
         return cast(str, setting.get("value"))
 
+    async def get_settings(self, keys: List[str]) -> Dict[str, str]:
+        """Obtém múltiplas configurações do Konecty.
+
+        Args:
+            keys: Lista de chaves das configurações a serem obtidas
+
+        Returns:
+            Dicionário com as chaves e seus respectivos valores. Chaves não encontradas terão valor None.
+        """
+        if not keys:
+            return {}
+
+        filter_params = KonectyFilter.create().add_condition("key", "in", keys)
+        find_params = KonectyFindParams(filter=filter_params)
+
+        settings = await self.find("Setting", find_params)
+
+        result = {}
+
+        for setting in settings:
+            key = setting.get("key")
+            value = setting.get("value")
+            result[key] = cast(str, value)
+
+        return result
+
+    def get_settings_sync(self, keys: List[str]) -> Dict[str, str]:
+        """Versão síncrona de get_settings.
+
+        Args:
+            keys: Lista de chaves das configurações a serem obtidas
+
+        Returns:
+            Dicionário com as chaves e seus respectivos valores. Chaves não encontradas terão valor None.
+        """
+        if not keys:
+            return {}
+
+        filter_params = KonectyFilter.create().add_condition("key", "in", keys)
+        find_params = KonectyFindParams(filter=filter_params)
+
+        settings = self.find_sync("Setting", find_params)
+
+        result = {}
+
+        for setting in settings:
+            key = setting.get("key")
+            value = setting.get("value")
+            result[key] = cast(str, value)
+
+        return result
+
     async def count_documents(self, module: str, filter_params: KonectyFilter) -> int:
         params: Dict[str, str] = {}
         options = KonectyFindParams(

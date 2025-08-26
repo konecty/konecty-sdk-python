@@ -56,19 +56,26 @@ async def fill_settings(settings_class: Type[T]) -> T:
     )
 
     settings_dict = {}
+    fields_to_fetch = []
 
+    # Primeiro verifica variáveis de ambiente e coleta campos que precisam ser buscados no Konecty
     for field_name in settings_class.model_fields.keys():
-        # Primeiro verifica se existe na variável de ambiente
         env_value = os.getenv(field_name.upper())
         if env_value is not None and env_value.strip():
             field_type = settings_class.model_fields[field_name].annotation
             converted_value = _convert_value(env_value, field_type)
             if converted_value is not None:
                 settings_dict[field_name] = converted_value
-                continue
-        # Se não encontrou na variável de ambiente, busca no Konecty
-        if field_name not in settings_dict:
-            value = await client.get_setting(field_name)
+        else:
+            fields_to_fetch.append(field_name)
+
+    # Busca todas as configurações do Konecty de uma vez
+    if fields_to_fetch:
+        konecty_settings = await client.get_settings(
+            [field.upper() for field in fields_to_fetch]
+        )
+
+        for field_name, value in konecty_settings.items():
             if value is not None and value.strip():
                 field_type = settings_class.model_fields[field_name].annotation
                 converted_value = _convert_value(value, field_type)
@@ -93,19 +100,27 @@ def fill_settings_sync(settings_class: Type[T]) -> T:
     )
 
     settings_dict = {}
+    fields_to_fetch = []
 
+    # Primeiro verifica variáveis de ambiente e coleta campos que precisam ser buscados no Konecty
     for field_name in settings_class.model_fields.keys():
-        # Primeiro verifica se existe na variável de ambiente
         env_value = os.getenv(field_name.upper())
         if env_value is not None and env_value.strip():
             field_type = settings_class.model_fields[field_name].annotation
             converted_value = _convert_value(env_value, field_type)
             if converted_value is not None:
                 settings_dict[field_name] = converted_value
-                continue
-        # Se não encontrou na variável de ambiente, busca no Konecty
-        if field_name not in settings_dict:
-            value = client.get_setting_sync(field_name)
+        else:
+            # Se não encontrou na variável de ambiente, adiciona à lista para buscar no Konecty
+            fields_to_fetch.append(field_name)
+
+    # Busca todas as configurações do Konecty de uma vez
+    if fields_to_fetch:
+        konecty_settings = client.get_settings_sync(
+            [field.upper() for field in fields_to_fetch]
+        )
+
+        for field_name, value in konecty_settings.items():
             if value is not None and value.strip():
                 field_type = settings_class.model_fields[field_name].annotation
                 converted_value = _convert_value(value, field_type)
