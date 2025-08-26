@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema, core_schema
 
@@ -395,13 +395,15 @@ class KonectyPersonName(BaseModel):
 
 
 class KonectyUpdateId(BaseModel):
-    _id: str = Field(alias="_id")
-    _updatedAt: KonectyDateTime = Field(alias="_updatedAt")
+    id: str = Field(alias="_id")
+    updatedAt: KonectyDateTime = Field(alias="_updatedAt")
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
-        id = data.get("_id")
-        updatedAt = data.get("_updatedAt")
+        id = data.get("_id", data.get("id", None))
+        updatedAt = data.get("_updatedAt", data.get("updatedAt", None))
         if id is None or updatedAt is None:
             raise ValueError("Invalid value for KonectyUpdateIds")
         return cls(id=id, updatedAt=KonectyDateTime.from_any(updatedAt))
@@ -411,4 +413,4 @@ class KonectyUpdateId(BaseModel):
         return [cls.from_dict(item) for item in data]
 
     def to_dict(self) -> dict[str, Any]:
-        return {"_id": self._id, "_updatedAt": self._updatedAt.to_json()}
+        return {"_id": self.id, "_updatedAt": self.updatedAt.to_json()}
