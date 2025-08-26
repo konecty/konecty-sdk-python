@@ -75,7 +75,8 @@ async def fill_settings(settings_class: Type[T]) -> T:
             [field.upper() for field in fields_to_fetch]
         )
 
-        for field_name, value in konecty_settings.items():
+        for field_name in settings_class.model_fields.keys():
+            value = konecty_settings.get(field_name.upper())
             if value is not None and value.strip():
                 field_type = settings_class.model_fields[field_name].annotation
                 converted_value = _convert_value(value, field_type)
@@ -120,7 +121,8 @@ def fill_settings_sync(settings_class: Type[T]) -> T:
             [field.upper() for field in fields_to_fetch]
         )
 
-        for field_name, value in konecty_settings.items():
+        for field_name in settings_class.model_fields.keys():
+            value = konecty_settings.get(field_name.upper())
             if value is not None and value.strip():
                 field_type = settings_class.model_fields[field_name].annotation
                 converted_value = _convert_value(value, field_type)
