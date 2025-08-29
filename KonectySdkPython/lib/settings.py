@@ -60,9 +60,12 @@ async def fill_settings(settings_class: Type[T]) -> T:
 
     # Primeiro verifica variáveis de ambiente e coleta campos que precisam ser buscados no Konecty
     for field_name in settings_class.model_fields.keys():
-        env_value = os.getenv(field_name.upper())
+        field = settings_class.model_fields[field_name]
+        field_str = get_field_name(field, field_name)
+
+        env_value = os.getenv(field_str.upper())
         if env_value is not None and env_value.strip():
-            field_type = settings_class.model_fields[field_name].annotation
+            field_type = field.annotation
             converted_value = _convert_value(env_value, field_type)
             if converted_value is not None:
                 settings_dict[field_name] = converted_value
@@ -76,9 +79,12 @@ async def fill_settings(settings_class: Type[T]) -> T:
         )
 
         for field_name in settings_class.model_fields.keys():
-            value = konecty_settings.get(field_name.upper())
+            field = settings_class.model_fields[field_name]
+            field_str = get_field_name(field, field_name)
+
+            value = konecty_settings.get(field_str.upper())
             if value is not None and value.strip():
-                field_type = settings_class.model_fields[field_name].annotation
+                field_type = field.annotation
                 converted_value = _convert_value(value, field_type)
                 if converted_value is not None:
                     settings_dict[field_name] = converted_value
@@ -105,9 +111,12 @@ def fill_settings_sync(settings_class: Type[T]) -> T:
 
     # Primeiro verifica variáveis de ambiente e coleta campos que precisam ser buscados no Konecty
     for field_name in settings_class.model_fields.keys():
-        env_value = os.getenv(field_name.upper())
+        field = settings_class.model_fields[field_name]
+        field_str = get_field_name(field, field_name)
+
+        env_value = os.getenv(field_str.upper())
         if env_value is not None and env_value.strip():
-            field_type = settings_class.model_fields[field_name].annotation
+            field_type = field.annotation
             converted_value = _convert_value(env_value, field_type)
             if converted_value is not None:
                 settings_dict[field_name] = converted_value
@@ -122,11 +131,22 @@ def fill_settings_sync(settings_class: Type[T]) -> T:
         )
 
         for field_name in settings_class.model_fields.keys():
-            value = konecty_settings.get(field_name.upper())
+            field = settings_class.model_fields[field_name]
+            field_str = get_field_name(field, field_name)
+
+            value = konecty_settings.get(field_str.upper())
             if value is not None and value.strip():
-                field_type = settings_class.model_fields[field_name].annotation
+                field_type = field.annotation
                 converted_value = _convert_value(value, field_type)
                 if converted_value is not None:
                     settings_dict[field_name] = converted_value
 
     return settings_class.model_construct(**settings_dict)
+
+
+def get_field_name(field, default: str = None) -> str:
+    return (
+        field.validation_alias
+        if field.validation_alias
+        else field.alias if field.alias else default
+    )
