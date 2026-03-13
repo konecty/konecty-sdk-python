@@ -3,12 +3,30 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, AsyncGenerator, Dict, List, Optional, Union, cast
+from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Union, cast
 
 import aiohttp
 
+from .exceptions import (
+    KonectyAPIError,
+    KonectyError,
+    KonectySerializationError,
+    KonectyValidationError,
+)
 from .file_manager import FileManager
 from .filters import KonectyFilter, KonectyFindParams
+from .http import request as _http_request
+from .http import StreamResponse
+from .feature_types.kpi import KpiConfig
+from .services.aggregation import AggregationService
+from .services.change_user import ChangeUserService
+from .services.comments import CommentsService
+from .services.export import ExportService
+from .services.files import FilesService
+from .services.notifications import NotificationsService
+from .services.query import QueryResult, QueryService
+from .services.stream import FindStreamResult, StreamService
+from .services.subscriptions import SubscriptionsService
 from .types import KonectyDateTime, KonectyUpdateId
 
 # Configura o logger do urllib3 para mostrar apenas erros
@@ -39,31 +57,6 @@ def get_first_dict(items: List[Any]) -> Optional[KonectyDict]:
     return None
 
 
-class KonectyError(Exception):
-    """Exceção base para erros do Konecty."""
-
-    pass
-
-
-class KonectyAPIError(KonectyError):
-    """Exceção para erros da API."""
-
-    pass
-
-
-class KonectyValidationError(KonectyError):
-    """Exceção para erros de validação."""
-
-    pass
-
-
-class KonectySerializationError(KonectyError):
-    """Exceção para erros de serialização."""
-
-    def __init__(self) -> None:
-        super().__init__("Tipo não serializável")
-
-
 def json_serial(obj: Any) -> str:
     """Serializa objetos para JSON."""
     if isinstance(obj, datetime):
@@ -76,6 +69,397 @@ class KonectyClient:
         self.base_url = base_url
         self.headers = {"Authorization": f"{token}"}
         self.file_manager = FileManager(base_url=base_url, headers=self.headers)
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+        stream: bool = False,
+        return_bytes: bool = False,
+    ) -> Any:
+        """Internal HTTP request. Used by client methods and services."""
+        return await _http_request(
+            self,
+            method,
+            path,
+            params=params,
+            json=json,
+            stream=stream,
+            return_bytes=return_bytes,
+        )
+
+    @property
+    def _stream(self) -> StreamService:
+        if not hasattr(self, "_stream_service"):
+            self._stream_service = StreamService(self)
+        return self._stream_service
+
+    async def find_stream(
+        self,
+        module: str,
+        options: KonectyFindParams,
+        *,
+        include_total: bool = False,
+    ) -> FindStreamResult:
+        """
+        Stream records as NDJSON. Returns result with .stream (async generator) and .total (when include_total).
+
+        Example:
+            result = await client.find_stream("Contact", options, include_total=True)
+            async for record in result.stream:
+                ...
+            total = result.total
+        """
+        return await self._stream.find_stream(module, options, include_total=include_total)
+
+    async def count_stream(
+        self,
+        module: str,
+        filter_params: Optional[KonectyFilter] = None,
+        **kwargs: Any,
+    ) -> int:
+        """Return total count for the module (GET /rest/stream/{module}/count)."""
+        return await self._stream.count_stream(module, filter_params, **kwargs)
+
+    @property
+    def _files(self) -> FilesService:
+        if not hasattr(self, "_files_service"):
+            self._files_service = FilesService(self)
+        return self._files_service
+
+    async def download_file(
+        self,
+        module: str,
+        record_code: str,
+        field_name: str,
+        file_name: str,
+    ) -> bytes:
+        """Download a file from a record field. Returns bytes."""
+        return await self._files.download_file(
+            module, record_code, field_name, file_name
+        )
+
+    async def download_image(
+        self,
+        module: str,
+        record_id: str,
+        field_name: str,
+        file_name: str,
+        *,
+        style: Optional[Literal["full", "thumb", "wm"]] = None,
+    ) -> bytes:
+        """Download an image (optional style: full, thumb, wm). Returns bytes."""
+        return await self._files.download_image(
+            module, record_id, field_name, file_name, style=style
+        )
+
+    @property
+    def _aggregation(self) -> AggregationService:
+        if not hasattr(self, "_aggregation_service"):
+            self._aggregation_service = AggregationService(self)
+        return self._aggregation_service
+
+    async def get_kpi(
+        self,
+        module: str,
+        kpi_config: KpiConfig,
+        *,
+        filter_params: Optional[KonectyFilter] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Run KPI aggregation. Returns dict with value and count."""
+        return await self._aggregation.get_kpi(
+            module, kpi_config, filter_params=filter_params, **kwargs
+        )
+
+    async def get_graph(
+        self,
+        module: str,
+        graph_config: Any,
+        *,
+        filter_params: Optional[KonectyFilter] = None,
+        **kwargs: Any,
+    ) -> str:
+        """Get graph as SVG string. graph_config: type, xAxis, yAxis, series, etc."""
+        return await self._aggregation.get_graph(
+            module, graph_config, filter_params=filter_params, **kwargs
+        )
+
+    async def get_pivot(
+        self,
+        module: str,
+        pivot_config: Any,
+        *,
+        filter_params: Optional[KonectyFilter] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Get pivot table result. pivot_config: rows, columns, values."""
+        return await self._aggregation.get_pivot(
+            module, pivot_config, filter_params=filter_params, **kwargs
+        )
+
+    @property
+    def _export(self) -> ExportService:
+        if not hasattr(self, "_export_service"):
+            self._export_service = ExportService(self)
+        return self._export_service
+
+    async def export_list(
+        self,
+        module: str,
+        list_name: str,
+        format: Literal["csv", "xlsx", "json", "xls"],
+        *,
+        filter_params: Optional[KonectyFilter] = None,
+        **kwargs: Any,
+    ) -> bytes:
+        """Export list as CSV, XLSX, or JSON. Returns file bytes."""
+        return await self._export.export_list(
+            module, list_name, format, filter_params=filter_params, **kwargs
+        )
+
+    @property
+    def _comments(self) -> CommentsService:
+        if not hasattr(self, "_comments_service"):
+            self._comments_service = CommentsService(self)
+        return self._comments_service
+
+    async def get_comments(self, module: str, data_id: str) -> Any:
+        """Get comments for a record."""
+        return await self._comments.get_comments(module, data_id)
+
+    async def create_comment(
+        self, module: str, data_id: str, text: str, parent_id: Optional[str] = None
+    ) -> Any:
+        """Create a comment (optionally reply via parent_id)."""
+        return await self._comments.create_comment(
+            module, data_id, text, parent_id=parent_id
+        )
+
+    async def update_comment(
+        self, module: str, data_id: str, comment_id: str, text: str
+    ) -> Any:
+        """Update a comment."""
+        return await self._comments.update_comment(
+            module, data_id, comment_id, text
+        )
+
+    async def delete_comment(
+        self, module: str, data_id: str, comment_id: str
+    ) -> Any:
+        """Delete (soft) a comment."""
+        return await self._comments.delete_comment(module, data_id, comment_id)
+
+    async def search_comment_users(
+        self, module: str, data_id: str, query: str = ""
+    ) -> Any:
+        """Search users for @mention autocomplete."""
+        return await self._comments.search_comment_users(
+            module, data_id, query
+        )
+
+    async def search_comments(
+        self,
+        module: str,
+        data_id: str,
+        *,
+        query: Optional[str] = None,
+        author_id: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        page: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> Any:
+        """Search comments with filters."""
+        return await self._comments.search_comments(
+            module,
+            data_id,
+            query=query,
+            author_id=author_id,
+            start_date=start_date,
+            end_date=end_date,
+            page=page,
+            limit=limit,
+        )
+
+    @property
+    def _subscriptions(self) -> SubscriptionsService:
+        if not hasattr(self, "_subscriptions_service"):
+            self._subscriptions_service = SubscriptionsService(self)
+        return self._subscriptions_service
+
+    async def get_subscription_status(self, module: str, data_id: str) -> Any:
+        """Get subscription status for a record."""
+        return await self._subscriptions.get_subscription_status(module, data_id)
+
+    async def subscribe(self, module: str, data_id: str) -> Any:
+        """Subscribe to record notifications."""
+        return await self._subscriptions.subscribe(module, data_id)
+
+    async def unsubscribe(self, module: str, data_id: str) -> Any:
+        """Unsubscribe from record."""
+        return await self._subscriptions.unsubscribe(module, data_id)
+
+    @property
+    def _notifications(self) -> NotificationsService:
+        if not hasattr(self, "_notifications_service"):
+            self._notifications_service = NotificationsService(self)
+        return self._notifications_service
+
+    async def list_notifications(
+        self,
+        *,
+        read: Optional[bool] = None,
+        page: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> Any:
+        """List user notifications."""
+        return await self._notifications.list_notifications(
+            read=read, page=page, limit=limit
+        )
+
+    async def get_unread_notifications_count(self) -> Any:
+        """Get unread notifications count."""
+        return await self._notifications.get_unread_count()
+
+    async def mark_notification_read(self, notification_id: str) -> Any:
+        """Mark a notification as read."""
+        return await self._notifications.mark_notification_read(notification_id)
+
+    async def mark_all_notifications_read(self) -> Any:
+        """Mark all notifications as read."""
+        return await self._notifications.mark_all_notifications_read()
+
+    @property
+    def _change_user(self) -> ChangeUserService:
+        if not hasattr(self, "_change_user_service"):
+            self._change_user_service = ChangeUserService(self)
+        return self._change_user_service
+
+    async def change_user_add(
+        self, module: str, ids: List[Any], users: Any
+    ) -> Any:
+        """Add users to records."""
+        return await self._change_user.add_users(module, ids, users)
+
+    async def change_user_remove(
+        self, module: str, ids: List[Any], users: Any
+    ) -> Any:
+        """Remove users from records."""
+        return await self._change_user.remove_users(module, ids, users)
+
+    async def change_user_define(
+        self, module: str, ids: List[Any], users: Any
+    ) -> Any:
+        """Define users on records."""
+        return await self._change_user.define_users(module, ids, users)
+
+    async def change_user_replace(
+        self,
+        module: str,
+        ids: List[Any],
+        *,
+        from_user: Any = None,
+        to_user: Any = None,
+    ) -> Any:
+        """Replace user on records."""
+        return await self._change_user.replace_users(
+            module, ids, from_user=from_user, to_user=to_user
+        )
+
+    async def change_user_count_inactive(self, module: str, ids: List[Any]) -> Any:
+        """Count inactive users on records."""
+        return await self._change_user.count_inactive(module, ids)
+
+    async def change_user_remove_inactive(self, module: str, ids: List[Any]) -> Any:
+        """Remove inactive users from records."""
+        return await self._change_user.remove_inactive(module, ids)
+
+    async def change_user_set_queue(
+        self, module: str, ids: List[Any], queue: Any
+    ) -> Any:
+        """Set queue on records."""
+        return await self._change_user.set_queue(module, ids, queue)
+
+    @property
+    def _query(self) -> QueryService:
+        if not hasattr(self, "_query_service"):
+            self._query_service = QueryService(self)
+        return self._query_service
+
+    async def execute_query_json(
+        self,
+        body: Any,
+        *,
+        include_total: bool = True,
+        include_meta: bool = False,
+    ) -> QueryResult:
+        """Execute cross-module query (POST /rest/query/json). Returns QueryResult with .stream, .total, .meta."""
+        return await self._query.execute_query_json(
+            body, include_total=include_total, include_meta=include_meta
+        )
+
+    async def execute_query_sql(
+        self,
+        sql: str,
+        *,
+        include_total: bool = True,
+        include_meta: bool = False,
+    ) -> QueryResult:
+        """Execute SQL query (POST /rest/query/sql). Returns QueryResult. SQL parse errors return 400."""
+        return await self._query.execute_query_sql(
+            sql, include_total=include_total, include_meta=include_meta
+        )
+
+    async def list_saved_queries(self) -> Any:
+        """List saved queries."""
+        return await self._query.list_saved_queries()
+
+    async def get_saved_query(self, query_id: str) -> Any:
+        """Get a saved query by id."""
+        return await self._query.get_saved_query(query_id)
+
+    async def create_saved_query(
+        self,
+        name: str,
+        query: Dict[str, Any],
+        description: Optional[str] = None,
+    ) -> Any:
+        """Create a saved query."""
+        return await self._query.create_saved_query(
+            name, query, description=description
+        )
+
+    async def update_saved_query(
+        self,
+        query_id: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        query: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Update a saved query."""
+        return await self._query.update_saved_query(
+            query_id, name=name, description=description, query=query
+        )
+
+    async def delete_saved_query(self, query_id: str) -> Any:
+        """Delete a saved query."""
+        return await self._query.delete_saved_query(query_id)
+
+    async def share_saved_query(
+        self,
+        query_id: str,
+        shared_with: List[Dict[str, Any]],
+        is_public: Optional[bool] = None,
+    ) -> Any:
+        """Share a saved query."""
+        return await self._query.share_saved_query(
+            query_id, shared_with, is_public=is_public
+        )
 
     async def find(self, module: str, options: KonectyFindParams) -> List[KonectyDict]:
         params: Dict[str, str] = {}

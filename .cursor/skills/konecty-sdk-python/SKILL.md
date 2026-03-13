@@ -14,9 +14,9 @@ This skill summarizes the Konecty SDK Python so the agent can correctly use its 
 
 ## What the SDK provides
 
-- **REST client** for the [Konecty](https://github.com/konecty/Konecty) CRM API: find, get by id, create, update, delete, get document/schema, get settings, count, file upload.
+- **REST client** for the [Konecty](https://github.com/konecty/Konecty) CRM API: find, get by id, create, update, delete, get document/schema, get settings, count, file upload; plus find_stream, count_stream, download_file, download_image, export_list, get_kpi, get_graph, get_pivot, comments, subscriptions, notifications, change_user, execute_query_json, execute_query_sql, saved queries (list/get/create/update/delete/share).
 - **CLI** `konecty-cli`: apply, backup, pull (metadata operations against MongoDB; not a substitute for the REST client).
-- **Types and filters**: Pydantic models for Konecty data (datetime, lookup, phone, email, etc.) and filter/sort builders for find queries.
+- **Types and filters**: Pydantic models for Konecty data (datetime, lookup, phone, email, etc.) and filter/sort builders for find queries. Feature types: KpiConfig, CrossModuleQuery/CrossModuleRelation (lib.feature_types).
 
 ## Environment
 
@@ -53,6 +53,19 @@ From `KonectySdkPython.lib` the same symbols are available; from `KonectySdkPyth
 - **Settings:** `get_setting(key)`, `get_settings(keys)` async; `get_setting_sync(key)`, `get_settings_sync(keys)` sync. They query the Setting module.
 - **Count:** `count_documents(module, filter_params: KonectyFilter) -> int`.
 - **Upload file:** `upload_file(module, record_code, field_name, file, file_name=None, file_type=None) -> str`. `file` can be bytes, URL string, or AsyncGenerator[bytes, None]. Returns file key from Konecty.
+- **Stream:** `find_stream(module, options: KonectyFindParams, include_total=False) -> FindStreamResult`. Result has `.stream` (async generator of dicts) and `.total` (int or None). Consume with `async for record in result.stream`.
+- **Stream count:** `count_stream(module, filter_params=None, **kwargs) -> int`. GET /rest/stream/{module}/count.
+- **Download file/image:** `download_file(module, record_code, field_name, file_name) -> bytes`; `download_image(module, record_id, field_name, file_name, style=None)` with style in full, thumb, wm. Returns bytes.
+- **Export:** `export_list(module, list_name, format, filter_params=None, ...) -> bytes`. format: csv, xlsx, json, xls.
+- **KPI:** `get_kpi(module, kpi_config: KpiConfig, filter_params=None, ...) -> dict` with value and count. KpiConfig from lib.feature_types (operation: count, sum, avg, min, max, countDistinct; field required for countDistinct).
+- **Graph:** `get_graph(module, graph_config, filter_params=None, ...) -> str` (SVG). graph_config: type, xAxis, yAxis, series, etc. (dict or Pydantic).
+- **Pivot:** `get_pivot(module, pivot_config, filter_params=None, ...) -> dict`. pivot_config: rows, columns, values.
+- **Comments:** `get_comments(module, data_id)`, `create_comment(module, data_id, text, parent_id=None)`, `update_comment`, `delete_comment`, `search_comment_users(module, data_id, query)`, `search_comments(module, data_id, query=..., author_id=..., ...)`.
+- **Subscriptions:** `get_subscription_status(module, data_id)`, `subscribe(module, data_id)`, `unsubscribe(module, data_id)`.
+- **Notifications:** `list_notifications(read=..., page=..., limit=...)`, `get_unread_notifications_count()`, `mark_notification_read(notification_id)`, `mark_all_notifications_read()`.
+- **Change user:** `change_user_add(module, ids, users)`, `change_user_remove`, `change_user_define`, `change_user_replace(module, ids, from_user=..., to_user=...)`, `change_user_count_inactive`, `change_user_remove_inactive`, `change_user_set_queue(module, ids, queue)`.
+- **Query customizada:** `execute_query_json(body, include_total=True, include_meta=False) -> QueryResult`. body: CrossModuleQuery (dict ou modelo em lib.feature_types.cross_module_query). `execute_query_sql(sql, include_total=True, include_meta=False) -> QueryResult`. QueryResult tem `.stream` (async generator), `.total`, `.meta`. Resposta do servidor é NDJSON; primeira linha pode ser _meta. SQL: apenas SELECT, máx. 10_000 caracteres; erros de parse retornam 400.
+- **Saved queries:** `list_saved_queries()`, `get_saved_query(id)`, `create_saved_query(name, query, description=None)`, `update_saved_query(id, name=..., description=..., query=...)`, `delete_saved_query(id)`, `share_saved_query(id, shared_with, is_public=None)`.
 
 All async methods use aiohttp; sync find uses requests. On API failure the client raises `KonectyAPIError` with the errors list from the response.
 
@@ -85,7 +98,7 @@ CLI operates on the metadata database (MongoDB), not on the REST data API. For C
 
 ## API endpoints (reference)
 
-The client uses these Konecty REST endpoints: GET `/rest/data/{module}/find`, GET `/rest/data/{module}/{id}`, POST/PUT/DELETE `/rest/data/{module}`, GET `/rest/menu/documents/{document_id}`, POST `/rest/file/upload/ns/access/{module}/{record_code}/{field_name}`. Responses use `success`, `data`, and `errors`. See project docs in `docs/api.md` for full details.
+The client uses the Konecty REST endpoints documented in `docs/api.md`, including stream (findStream, count), file/image download, export (list), kpi, graph, pivot, comment, subscription, notification, changeUser, query/json, query/sql, and query/saved. Responses use `success`, `data`, and `errors` where applicable; stream endpoints return NDJSON. Query custom (JSON/SQL) is described in detail in api.md (CrossModuleQuery schema, SQL limits, NDJSON format, _meta, X-Total-Count).
 
 ## Common pitfalls
 
