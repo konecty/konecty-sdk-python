@@ -3,7 +3,8 @@
 import json
 from typing import Any, AsyncGenerator, Dict, Optional
 
-from ..client import KonectyDict, json_serial
+from ..serialization import json_serial
+from ..types import KonectyDict
 from ..filters import KonectyFilter, KonectyFindParams
 from ..http import StreamResponse
 from .base import BaseService

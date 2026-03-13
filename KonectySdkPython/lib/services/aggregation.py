@@ -3,7 +3,7 @@
 import json
 from typing import Any, Dict, Optional, Union
 
-from ..client import json_serial
+from ..serialization import json_serial
 from ..filters import KonectyFilter
 from ..feature_types.kpi import KpiConfig
 from .base import BaseService

@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema, core_schema
 
+KonectyDict = Dict[str, Any]
+
 
 class KonectyDateTimeError(Exception):
     """Exceção base para erros de data/hora."""

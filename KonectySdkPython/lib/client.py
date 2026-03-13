@@ -10,7 +10,6 @@ import aiohttp
 from .exceptions import (
     KonectyAPIError,
     KonectyError,
-    KonectySerializationError,
     KonectyValidationError,
 )
 from .file_manager import FileManager
@@ -18,6 +17,7 @@ from .filters import KonectyFilter, KonectyFindParams
 from .http import request as _http_request
 from .http import StreamResponse
 from .feature_types.kpi import KpiConfig
+from .serialization import json_serial
 from .services.aggregation import AggregationService
 from .services.change_user import ChangeUserService
 from .services.comments import CommentsService
@@ -27,14 +27,12 @@ from .services.notifications import NotificationsService
 from .services.query import QueryResult, QueryService
 from .services.stream import FindStreamResult, StreamService
 from .services.subscriptions import SubscriptionsService
-from .types import KonectyDateTime, KonectyUpdateId
+from .types import KonectyDateTime, KonectyDict, KonectyUpdateId
 
 # Configura o logger do urllib3 para mostrar apenas erros
 logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 
 logger = logging.getLogger(__name__)
-
-KonectyDict = Dict[str, Any]
 
 KONECTY_UPDATE_IGNORE_FIELDS = [
     "_id",
@@ -55,13 +53,6 @@ def get_first_dict(items: List[Any]) -> Optional[KonectyDict]:
     if isinstance(first, dict):
         return cast(KonectyDict, first)
     return None
-
-
-def json_serial(obj: Any) -> str:
-    """Serializa objetos para JSON."""
-    if isinstance(obj, datetime):
-        return {"$date": obj.isoformat()}
-    raise KonectySerializationError()
 
 
 class KonectyClient:

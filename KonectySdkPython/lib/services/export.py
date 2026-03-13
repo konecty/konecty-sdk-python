@@ -3,7 +3,7 @@
 import json
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from ..client import json_serial
+from ..serialization import json_serial
 from ..filters import KonectyFilter
 from .base import BaseService
 

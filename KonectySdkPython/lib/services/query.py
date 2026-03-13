@@ -3,7 +3,7 @@
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
-from ..client import KonectyDict
+from ..types import KonectyDict
 from ..exceptions import KonectyAPIError
 from ..http import StreamResponse
 from .base import BaseService
