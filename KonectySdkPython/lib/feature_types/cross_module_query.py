@@ -10,7 +10,9 @@ MAX_RELATION_LIMIT = 100_000
 DEFAULT_RELATION_LIMIT = 1000
 DEFAULT_PRIMARY_LIMIT = 1000
 
-AggregatorName = str  # count, countDistinct, sum, avg, min, max, first, last, push, addToSet
+AggregatorName = (
+    str  # count, countDistinct, sum, avg, min, max, first, last, push, addToSet
+)
 
 
 class Aggregator(BaseModel):
@@ -46,7 +48,9 @@ class CrossModuleRelation(BaseModel):
     limit: int = Field(default=DEFAULT_RELATION_LIMIT, ge=1, le=MAX_RELATION_LIMIT)
     start: int = Field(default=0, ge=0)
     aggregators: Dict[str, Aggregator] = Field(..., min_length=1)
-    relations: Optional[List["CrossModuleRelation"]] = Field(default=None, max_length=MAX_RELATIONS)
+    relations: Optional[List["CrossModuleRelation"]] = Field(
+        default=None, max_length=MAX_RELATIONS
+    )
 
     model_config = {"extra": "allow"}
 
@@ -63,7 +67,9 @@ class CrossModuleQuery(BaseModel):
     sort: Optional[Union[str, List[SortItem]]] = None
     limit: int = Field(default=DEFAULT_PRIMARY_LIMIT, ge=1, le=MAX_RELATION_LIMIT)
     start: int = Field(default=0, ge=0)
-    relations: List[CrossModuleRelation] = Field(default_factory=list, max_length=MAX_RELATIONS)
+    relations: List[CrossModuleRelation] = Field(
+        default_factory=list, max_length=MAX_RELATIONS
+    )
     groupBy: List[str] = Field(default_factory=list, alias="groupBy")
     aggregators: Dict[str, Aggregator] = Field(default_factory=dict)
     includeTotal: bool = Field(default=True, alias="includeTotal")

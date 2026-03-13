@@ -403,9 +403,55 @@ async for record in result.stream:
     print(record.get("offers"), record.get("offerCount"))
 ```
 
+### Custom query (JSON) — typed creator (QueryJson, QueryRelation, etc.)
+
+Fully typed classes/dataclasses for intellisense; no builder. Import from `KonectySdkPython.lib.feature_types` (or `KonectySdkPython.lib.feature_types.query_json`). Pass the instance to `execute_query_json` (it accepts objects with `to_dict()` or `model_dump()`), or call `query.to_dict()` and pass the dict.
+
+```python
+from KonectySdkPython import KonectyClient
+from KonectySdkPython.lib.feature_types import (
+    QueryJson,
+    QueryRelation,
+    QueryFilter,
+    QueryFilterCondition,
+    QuerySortItem,
+    AggregatorSpec,
+)
+
+# Contact + Opportunity with count, with filter on root and relation
+query = QueryJson(
+    document="Contact",
+    fields="code,name",
+    sort=[QuerySortItem(property="name.full", direction="ASC")],
+    limit=1000,
+    include_total=True,
+    include_meta=False,
+    filter=QueryFilter(
+        match="and",
+        conditions=[QueryFilterCondition(term="status", operator="equals", value="active")],
+    ),
+    relations=[
+        QueryRelation(
+            document="Opportunity",
+            lookup="contact",
+            filter=QueryFilter(
+                match="and",
+                conditions=[QueryFilterCondition(term="status", operator="in", value=["Nova", "Em Visitação"])],
+            ),
+            aggregators={"activeOpportunities": AggregatorSpec(aggregator="count")},
+        ),
+    ],
+)
+result = await client.execute_query_json(query)  # client calls query.to_dict() internally
+async for record in result.stream:
+    print(record.get("code"), record.get("activeOpportunities"))
+```
+
+Nested relations and other aggregators (push, first, sum, etc.) use the same types; `AggregatorSpec(aggregator="count")` has no field; for `countDistinct` or `first`/`last` pass `field="fieldName"`. Types `AggregatorName`, `FilterMatch`, `SortDirection` are Literals for full autocomplete.
+
 ### Custom query (SQL) — JOIN and GROUP BY
 
-From queryApi.test: SELECT with INNER JOIN, GROUP BY, ORDER BY, LIMIT. Server returns NDJSON; first line can be _meta when includeMeta true.
+From queryApi.test: SELECT with INNER JOIN, GROUP BY, ORDER BY, LIMIT. Server returns NDJSON; first line can be \_meta when includeMeta true.
 
 ```python
 sql = """
@@ -425,7 +471,7 @@ async for record in result.stream:
 
 ### Custom query (SQL) — error handling
 
-Empty SQL or non-SELECT returns 400 with _meta.success false and errors; SDK raises KonectyAPIError.
+Empty SQL or non-SELECT returns 400 with \_meta.success false and errors; SDK raises KonectyAPIError.
 
 ```python
 from KonectySdkPython import KonectyClient
@@ -496,30 +542,30 @@ with open("contacts.csv", "wb") as f:
 
 ## 21. Quick reference table (KonectyClient methods)
 
-| Method | Async | Returns |
-|--------|--------|--------|
-| find, find_sync | yes / no | List[KonectyDict] |
-| find_one, find_one_sync | yes / no | Optional[KonectyDict] |
-| find_by_id | yes | Optional[KonectyDict] |
-| find_stream | yes | FindStreamResult (.stream, .total) |
-| count_stream | yes | int |
-| count_documents | yes | int |
-| create | yes | Optional[KonectyDict] |
-| update_one, update | yes | Optional[KonectyDict] / list |
-| delete_one | yes | Optional[KonectyDict] |
-| upload_file | yes | str (file key) |
-| download_file, download_image | yes | bytes |
-| export_list | yes | bytes |
-| get_kpi, get_graph, get_pivot | yes | dict / str (SVG) / dict |
-| get_comments, create_comment, update_comment, delete_comment | yes | dict |
-| search_comment_users, search_comments | yes | dict |
-| get_subscription_status, subscribe, unsubscribe | yes | dict |
-| list_notifications, get_unread_notifications_count | yes | dict |
-| mark_notification_read, mark_all_notifications_read | yes | dict |
-| change_user_* (add, remove, define, replace, count_inactive, remove_inactive, set_queue) | yes | dict |
-| execute_query_json, execute_query_sql | yes | QueryResult (.stream, .total, .meta) |
-| list_saved_queries, get_saved_query, create_saved_query, update_saved_query, delete_saved_query, share_saved_query | yes | dict |
-| get_document, get_schema | yes | Optional[KonectyDict] |
-| get_setting, get_settings (and _sync) | yes / no | Optional[str] / Dict[str, str] |
+| Method                                                                                                             | Async    | Returns                              |
+| ------------------------------------------------------------------------------------------------------------------ | -------- | ------------------------------------ |
+| find, find_sync                                                                                                    | yes / no | List[KonectyDict]                    |
+| find_one, find_one_sync                                                                                            | yes / no | Optional[KonectyDict]                |
+| find_by_id                                                                                                         | yes      | Optional[KonectyDict]                |
+| find_stream                                                                                                        | yes      | FindStreamResult (.stream, .total)   |
+| count_stream                                                                                                       | yes      | int                                  |
+| count_documents                                                                                                    | yes      | int                                  |
+| create                                                                                                             | yes      | Optional[KonectyDict]                |
+| update_one, update                                                                                                 | yes      | Optional[KonectyDict] / list         |
+| delete_one                                                                                                         | yes      | Optional[KonectyDict]                |
+| upload_file                                                                                                        | yes      | str (file key)                       |
+| download_file, download_image                                                                                      | yes      | bytes                                |
+| export_list                                                                                                        | yes      | bytes                                |
+| get_kpi, get_graph, get_pivot                                                                                      | yes      | dict / str (SVG) / dict              |
+| get_comments, create_comment, update_comment, delete_comment                                                       | yes      | dict                                 |
+| search_comment_users, search_comments                                                                              | yes      | dict                                 |
+| get_subscription_status, subscribe, unsubscribe                                                                    | yes      | dict                                 |
+| list_notifications, get_unread_notifications_count                                                                 | yes      | dict                                 |
+| mark_notification_read, mark_all_notifications_read                                                                | yes      | dict                                 |
+| change*user*\* (add, remove, define, replace, count_inactive, remove_inactive, set_queue)                          | yes      | dict                                 |
+| execute_query_json, execute_query_sql                                                                              | yes      | QueryResult (.stream, .total, .meta) |
+| list_saved_queries, get_saved_query, create_saved_query, update_saved_query, delete_saved_query, share_saved_query | yes      | dict                                 |
+| get_document, get_schema                                                                                           | yes      | Optional[KonectyDict]                |
+| get_setting, get_settings (and \_sync)                                                                             | yes / no | Optional[str] / Dict[str, str]       |
 
 Use this document as the single reference when implementing or reviewing code that depends on the Konecty SDK Python. Do not rely on external docs or other files; all usage, examples, and caveats are above.

@@ -1,11 +1,11 @@
 ---
 name: konecty-sdk-python
 description: >-
-  Teaches the agent how to use the Konecty SDK Python (client, filters, types,
-  settings, CLI) for the Konecty CRM REST API. Use when the project depends on
-  konecty-sdk-python or konecty_sdk_python, when the user asks about Konecty
-  API integration, CRUD with Konecty, find/filter records, upload files to
-  Konecty, or konecty-cli commands.
+    Teaches the agent how to use the Konecty SDK Python (client, filters, types,
+    settings, CLI) for the Konecty CRM REST API. Use when the project depends on
+    konecty-sdk-python or konecty_sdk_python, when the user asks about Konecty
+    API integration, CRUD with Konecty, find/filter records, upload files to
+    Konecty, or konecty-cli commands.
 ---
 
 # Konecty SDK Python — Agent Skill
@@ -45,9 +45,9 @@ From `KonectySdkPython.lib` the same symbols are available; from `KonectySdkPyth
 - **Find (sync):** `find_sync(module, options)` — same contract, blocking.
 - **Find one:** `find_one(module, filter_params)` async; `find_one_sync(module, filter_params)` sync. Both return one record or None.
 - **By ID:** `find_by_id(module: str, id: str) -> Optional[KonectyDict]`.
-- **Create:** `create(module: str, data: KonectyDict) -> Optional[KonectyDict]`. Do not send _createdAt, _updatedAt, _createdBy, _updatedBy; SDK strips them.
-- **Update one:** `update_one(module, id, updatedAt: datetime, data: KonectyDict)`. Requires current _updatedAt for concurrency.
-- **Update many:** `update(module, ids: list[KonectyUpdateId], data: KonectyDict) -> list[KonectyDict]`. Each id is dict with _id and _updatedAt (use `KonectyUpdateId.from_dict`).
+- **Create:** `create(module: str, data: KonectyDict) -> Optional[KonectyDict]`. Do not send \_createdAt, \_updatedAt, \_createdBy, \_updatedBy; SDK strips them.
+- **Update one:** `update_one(module, id, updatedAt: datetime, data: KonectyDict)`. Requires current \_updatedAt for concurrency.
+- **Update many:** `update(module, ids: list[KonectyUpdateId], data: KonectyDict) -> list[KonectyDict]`. Each id is dict with \_id and \_updatedAt (use `KonectyUpdateId.from_dict`).
 - **Delete:** `delete_one(module, id, updatedAt: datetime)`.
 - **Document/schema:** `get_document(document_id)`, `get_schema(document_id)` — return metadata for a document type.
 - **Settings:** `get_setting(key)`, `get_settings(keys)` async; `get_setting_sync(key)`, `get_settings_sync(keys)` sync. They query the Setting module.
@@ -64,7 +64,7 @@ From `KonectySdkPython.lib` the same symbols are available; from `KonectySdkPyth
 - **Subscriptions:** `get_subscription_status(module, data_id)`, `subscribe(module, data_id)`, `unsubscribe(module, data_id)`.
 - **Notifications:** `list_notifications(read=..., page=..., limit=...)`, `get_unread_notifications_count()`, `mark_notification_read(notification_id)`, `mark_all_notifications_read()`.
 - **Change user:** `change_user_add(module, ids, users)`, `change_user_remove`, `change_user_define`, `change_user_replace(module, ids, from_user=..., to_user=...)`, `change_user_count_inactive`, `change_user_remove_inactive`, `change_user_set_queue(module, ids, queue)`.
-- **Query customizada:** `execute_query_json(body, include_total=True, include_meta=False) -> QueryResult`. body: CrossModuleQuery (dict ou modelo em lib.feature_types.cross_module_query). `execute_query_sql(sql, include_total=True, include_meta=False) -> QueryResult`. QueryResult tem `.stream` (async generator), `.total`, `.meta`. Resposta do servidor é NDJSON; primeira linha pode ser _meta. SQL: apenas SELECT, máx. 10_000 caracteres; erros de parse retornam 400.
+- **Query customizada:** `execute_query_json(body, include_total=True, include_meta=False) -> QueryResult`. body: dict, CrossModuleQuery (Pydantic), ou **QueryJson** (criador tipado em lib.feature_types.query_json). O criador tipado usa classes/dataclasses com props (sem builder): `QueryJson`, `QueryRelation`, `QueryFilter`, `QueryFilterCondition`, `QuerySortItem`, `AggregatorSpec`, `ExplicitJoinCondition`; tipos `AggregatorName`, `FilterMatch`, `SortDirection`. Instancie com propriedades e chame `.to_dict()` no QueryJson (ou passe a instância diretamente; o client aceita objetos com `to_dict()` ou `model_dump()`). `execute_query_sql(sql, ...) -> QueryResult`. QueryResult: `.stream`, `.total`, `.meta`. Resposta NDJSON; SQL: apenas SELECT, máx. 10_000 caracteres.
 - **Saved queries:** `list_saved_queries()`, `get_saved_query(id)`, `create_saved_query(name, query, description=None)`, `update_saved_query(id, name=..., description=..., query=...)`, `delete_saved_query(id)`, `share_saved_query(id, shared_with, is_public=None)`.
 
 All async methods use aiohttp; sync find uses requests. On API failure the client raises `KonectyAPIError` with the errors list from the response.
@@ -98,12 +98,12 @@ CLI operates on the metadata database (MongoDB), not on the REST data API. For C
 
 ## API endpoints (reference)
 
-The client uses the Konecty REST endpoints documented in `docs/api.md`, including stream (findStream, count), file/image download, export (list), kpi, graph, pivot, comment, subscription, notification, changeUser, query/json, query/sql, and query/saved. Responses use `success`, `data`, and `errors` where applicable; stream endpoints return NDJSON. Query custom (JSON/SQL) is described in detail in api.md (CrossModuleQuery schema, SQL limits, NDJSON format, _meta, X-Total-Count).
+The client uses the Konecty REST endpoints documented in `docs/api.md`, including stream (findStream, count), file/image download, export (list), kpi, graph, pivot, comment, subscription, notification, changeUser, query/json, query/sql, and query/saved. Responses use `success`, `data`, and `errors` where applicable; stream endpoints return NDJSON. Query custom (JSON/SQL) is described in detail in api.md (CrossModuleQuery schema, SQL limits, NDJSON format, \_meta, X-Total-Count).
 
 ## Common pitfalls
 
 - **Authorization:** Send the token as-is in the Authorization header; the SDK does not add "Bearer". Configure the same token Konecty expects (e.g. from login or API key).
-- **Update/delete:** Always pass the current `_updatedAt` of the record; Konecty uses it for optimistic concurrency. After a find, use the same record’s _updatedAt for update_one or delete_one.
+- **Update/delete:** Always pass the current `_updatedAt` of the record; Konecty uses it for optimistic concurrency. After a find, use the same record’s \_updatedAt for update_one or delete_one.
 - **Module name:** The `module` parameter is the Konecty document name (e.g. Contact, User, Setting), not a URL path. Get document names from the app or from get_document/get_schema.
 - **Filter serialization:** Datetimes in filters must be serializable to Konecty format; the client uses a json_serial that emits `$date` for datetime. Use KonectyFilter/KonectyFindParams so the SDK serializes correctly.
 

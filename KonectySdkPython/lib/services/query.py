@@ -93,7 +93,9 @@ class QueryService(BaseService):
         Execute a cross-module query. POST /rest/query/json. Body is CrossModuleQuery (dict or model).
         Returns QueryResult with .stream (async generator), .total, .meta.
         """
-        if hasattr(body, "model_dump"):
+        if hasattr(body, "to_dict"):
+            payload = body.to_dict()
+        elif hasattr(body, "model_dump"):
             payload = body.model_dump(by_alias=True, exclude_none=True)
         else:
             payload = dict(body)
