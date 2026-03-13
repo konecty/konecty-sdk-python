@@ -65,7 +65,7 @@ class StreamService(BaseService):
         assert isinstance(raw, StreamResponse)
         total: Optional[int] = None
         if include_total:
-            tc = raw.headers.get("X-Total-Count")
+            tc = raw.headers.get("x-total-count")
             if tc is not None:
                 try:
                     total = int(tc)

@@ -34,7 +34,7 @@ async def _build_query_result(
     total: Optional[int] = None
     meta: Optional[Dict[str, Any]] = None
     if include_total:
-        tc = raw.headers.get("X-Total-Count")
+        tc = raw.headers.get("x-total-count")
         if tc is not None:
             try:
                 total = int(tc)
