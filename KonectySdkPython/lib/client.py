@@ -477,6 +477,35 @@ class KonectyClient:
                 raise KonectyAPIError(errors)
             data = result.get("data", [])
             return cast(List[KonectyDict], data)
+    
+    async def lookup(self, module: str, lookup_field: str, options: KonectyFindParams, search: str = "") -> List[KonectyDict]:
+        params: Dict[str, str] = {}
+        for key, value in options.model_dump(exclude_none=True).items():
+            params[key] = (
+                json.dumps(value, default=json_serial)
+                if key != "fields"
+                else ",".join(value)
+            )
+        if search:
+            params["search"] = search
+
+        print(f"params: {params}")
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(
+                f"{self.base_url}/rest/data/{module}/lookup/{lookup_field}",
+                params=params,
+                headers={"Authorization": self.headers["Authorization"]},
+            ) as response,
+        ):
+            response.raise_for_status()
+            result = await response.json()
+            if not result.get("success", False):
+                errors = result.get("errors", [])
+                logger.error(errors)
+                raise KonectyAPIError(errors)
+            data = result.get("data", [])
+            return cast(List[KonectyDict], data)
 
     def find_sync(self, module: str, options: KonectyFindParams) -> List[KonectyDict]:
         """Versão síncrona de find."""

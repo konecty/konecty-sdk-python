@@ -22,6 +22,7 @@ Quando `success` é falso, o SDK converte a resposta em exceção `KonectyAPIErr
 | Endpoint                                                          | Método | Propósito                                                                                                              | Uso no SDK                                          |
 | ----------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | `/rest/data/{module}/find`                                        | GET    | Buscar registros com filtro, ordenação, paginação e projeção de campos.                                                | `find`, `find_sync`, `count_documents` em client.py |
+| `/rest/data/{module}/lookup/{lookup_field}`                       | GET    | Buscar opções de lookup por campo de relacionamento com os mesmos parâmetros de find e termo livre de busca.         | `lookup` em client.py                               |
 | `/rest/data/{module}/{id}`                                        | GET    | Obter um registro pelo identificador.                                                                                  | `find_by_id` em client.py                           |
 | `/rest/data/{module}`                                             | POST   | Criar um novo registro. Corpo: objeto com os campos do documento.                                                      | `create` em client.py                               |
 | `/rest/data/{module}`                                             | PUT    | Atualizar um ou mais registros. Corpo: objeto com `ids` (lista de `_id` e `_updatedAt`) e `data` (campos a atualizar). | `update_one`, `update` em client.py                 |
@@ -42,6 +43,16 @@ Os parâmetros são enviados como query string. O SDK monta esses parâmetros a 
 - **fields:** lista de nomes de campos a retornar; no SDK é enviada como string separada por vírgula.
 
 A API do Konecty aceita ainda parâmetros opcionais como `displayName`, `displayType` e `withDetailFields`; o SDK atual não os expõe diretamente nos métodos de find.
+
+## Parâmetros do lookup (GET /rest/data/{module}/lookup/{lookup_field})
+
+O método assíncrono `lookup` usa a mesma estrutura de parâmetros de `KonectyFindParams` (filter, start, limit, sort e fields), com serialização idêntica ao find:
+
+- **fields:** enviado como lista separada por vírgula.
+- **demais parâmetros estruturados:** enviados em JSON na query string.
+- **search:** string opcional para busca textual livre no lookup.
+
+O endpoint retorna uma lista no campo `data` e segue o mesmo contrato de erros (`success` e `errors`) dos demais endpoints de dados.
 
 ## Formato de filtro (Konecty)
 
@@ -122,4 +133,4 @@ Além das consultas salvas, o Konecty expõe execução direta de consultas cros
 
 ## Outros endpoints do Konecty (não utilizados pelo SDK)
 
-O Konecty expõe ainda, entre outros: Menu (list, documents), Data (lookup, history, relations, queue, lead/save), File (delete), Auth, health, process, etc. A documentação acima cobre o que o SDK utiliza e o contrato da query customizada.
+O Konecty expõe ainda, entre outros: Menu (list, documents), Data (history, relations, queue, lead/save), File (delete), Auth, health, process, etc. A documentação acima cobre o que o SDK utiliza e o contrato da query customizada.
