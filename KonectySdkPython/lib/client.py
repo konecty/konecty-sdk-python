@@ -7,16 +7,12 @@ from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Union, ca
 
 import aiohttp
 
-from .exceptions import (
-    KonectyAPIError,
-    KonectyError,
-    KonectyValidationError,
-)
+from .exceptions import KonectyAPIError, KonectyError, KonectyValidationError
+from .feature_types.kpi import KpiConfig
 from .file_manager import FileManager
 from .filters import KonectyFilter, KonectyFindParams
-from .http import request as _http_request
 from .http import StreamResponse
-from .feature_types.kpi import KpiConfig
+from .http import request as _http_request
 from .serialization import json_serial
 from .services.aggregation import AggregationService
 from .services.change_user import ChangeUserService
@@ -104,7 +100,9 @@ class KonectyClient:
                 ...
             total = result.total
         """
-        return await self._stream.find_stream(module, options, include_total=include_total)
+        return await self._stream.find_stream(
+            module, options, include_total=include_total
+        )
 
     async def count_stream(
         self,
@@ -234,13 +232,9 @@ class KonectyClient:
         self, module: str, data_id: str, comment_id: str, text: str
     ) -> Any:
         """Update a comment."""
-        return await self._comments.update_comment(
-            module, data_id, comment_id, text
-        )
+        return await self._comments.update_comment(module, data_id, comment_id, text)
 
-    async def delete_comment(
-        self, module: str, data_id: str, comment_id: str
-    ) -> Any:
+    async def delete_comment(self, module: str, data_id: str, comment_id: str) -> Any:
         """Delete (soft) a comment."""
         return await self._comments.delete_comment(module, data_id, comment_id)
 
@@ -248,9 +242,7 @@ class KonectyClient:
         self, module: str, data_id: str, query: str = ""
     ) -> Any:
         """Search users for @mention autocomplete."""
-        return await self._comments.search_comment_users(
-            module, data_id, query
-        )
+        return await self._comments.search_comment_users(module, data_id, query)
 
     async def search_comments(
         self,
@@ -330,21 +322,15 @@ class KonectyClient:
             self._change_user_service = ChangeUserService(self)
         return self._change_user_service
 
-    async def change_user_add(
-        self, module: str, ids: List[Any], users: Any
-    ) -> Any:
+    async def change_user_add(self, module: str, ids: List[Any], users: Any) -> Any:
         """Add users to records."""
         return await self._change_user.add_users(module, ids, users)
 
-    async def change_user_remove(
-        self, module: str, ids: List[Any], users: Any
-    ) -> Any:
+    async def change_user_remove(self, module: str, ids: List[Any], users: Any) -> Any:
         """Remove users from records."""
         return await self._change_user.remove_users(module, ids, users)
 
-    async def change_user_define(
-        self, module: str, ids: List[Any], users: Any
-    ) -> Any:
+    async def change_user_define(self, module: str, ids: List[Any], users: Any) -> Any:
         """Define users on records."""
         return await self._change_user.define_users(module, ids, users)
 
@@ -691,7 +677,7 @@ class KonectyClient:
     async def get_setting(self, key: str) -> Optional[str]:
         """Obtém uma configuração do Konecty."""
         setting = await self.find_one(
-            "Setting", KonectyFilter.create().add_condition("key", "equals", key)
+            "Setting", KonectyFilter.create().add_condition("name", "equals", key)
         )
         if setting is None:
             return None
@@ -700,13 +686,15 @@ class KonectyClient:
     def get_setting_sync(self, key: str) -> Optional[str]:
         """Versão síncrona de get_setting."""
         setting = self.find_one_sync(
-            "Setting", KonectyFilter.create().add_condition("key", "equals", key)
+            "Setting", KonectyFilter.create().add_condition("name", "equals", key)
         )
         if setting is None:
             return None
         return cast(str, setting.get("value"))
 
-    async def get_settings(self, keys: List[str]) -> Dict[str, str]:
+    async def get_settings(
+        self, keys: List[str], *, module: str | None = None
+    ) -> Dict[str, str]:
         """Obtém múltiplas configurações do Konecty.
 
         Args:
@@ -718,7 +706,9 @@ class KonectyClient:
         if not keys:
             return {}
 
-        filter_params = KonectyFilter.create().add_condition("key", "in", keys)
+        filter_params = KonectyFilter.create().add_condition("name", "in", keys)
+        if module:
+            filter_params.add_condition("module", "equals", module)
         find_params = KonectyFindParams(filter=filter_params)
 
         settings = await self.find("Setting", find_params)
@@ -726,13 +716,15 @@ class KonectyClient:
         result = {}
 
         for setting in settings:
-            key = setting.get("key")
+            key = setting.get("name")
             value = setting.get("value")
             result[key] = cast(str, value)
 
         return result
 
-    def get_settings_sync(self, keys: List[str]) -> Dict[str, str]:
+    def get_settings_sync(
+        self, keys: List[str], *, module: str | None = None
+    ) -> Dict[str, str]:
         """Versão síncrona de get_settings.
 
         Args:
@@ -744,7 +736,9 @@ class KonectyClient:
         if not keys:
             return {}
 
-        filter_params = KonectyFilter.create().add_condition("key", "in", keys)
+        filter_params = KonectyFilter.create().add_condition("name", "in", keys)
+        if module:
+            filter_params.add_condition("module", "equals", module)
         find_params = KonectyFindParams(filter=filter_params)
 
         settings = self.find_sync("Setting", find_params)
@@ -752,7 +746,7 @@ class KonectyClient:
         result = {}
 
         for setting in settings:
-            key = setting.get("key")
+            key = setting.get("name")
             value = setting.get("value")
             result[key] = cast(str, value)
 
