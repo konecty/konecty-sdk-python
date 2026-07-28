@@ -15,6 +15,7 @@ from .http import StreamResponse
 from .http import request as _http_request
 from .serialization import json_serial
 from .services.aggregation import AggregationService
+from .services.auth import AuthService
 from .services.change_user import ChangeUserService
 from .services.comments import CommentsService
 from .services.export import ExportService
@@ -52,10 +53,20 @@ def get_first_dict(items: List[Any]) -> Optional[KonectyDict]:
 
 
 class KonectyClient:
-    def __init__(self, base_url: str, token: str) -> None:
+    def __init__(self, base_url: str, token: str = "") -> None:
         self.base_url = base_url
         self.headers = {"Authorization": f"{token}"}
         self.file_manager = FileManager(base_url=base_url, headers=self.headers)
+
+    @property
+    def auth_id(self) -> Optional[str]:
+        """Current session token (authId) sent in the Authorization header, or None."""
+        return self.headers.get("Authorization") or None
+
+    def set_auth_id(self, auth_id: str) -> None:
+        """Adopt a session token so following requests are authenticated."""
+        # headers is shared with file_manager: mutate in place so both see the token.
+        self.headers["Authorization"] = auth_id
 
     async def _request(
         self,
@@ -360,6 +371,51 @@ class KonectyClient:
     ) -> Any:
         """Set queue on records."""
         return await self._change_user.set_queue(module, ids, queue)
+
+    @property
+    def _auth(self) -> AuthService:
+        if not hasattr(self, "_auth_service"):
+            self._auth_service = AuthService(self)
+        return self._auth_service
+
+    def google_login_url(
+        self,
+        client_id: str,
+        redirect_uri: Optional[str] = None,
+        state: Optional[str] = None,
+    ) -> str:
+        """Build the URL of GET /api/auth/google/start. Pure, performs no request."""
+        return self._auth.google_login_url(
+            client_id, redirect_uri=redirect_uri, state=state
+        )
+
+    async def exchange_google_code(
+        self,
+        code: str,
+        *,
+        geolocation: Optional[Union[Dict[str, Any], str]] = None,
+        resolution: Optional[Union[Dict[str, Any], str]] = None,
+        source: Optional[str] = None,
+        fingerprint: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Exchange the single-use code from the callback for a session
+        (POST /api/auth/google/session).
+
+        On success adopts the returned authId in this client. On error raises
+        KonectyAPIError with errors[0].message and keeps the client unauthenticated.
+        """
+        return await self._auth.exchange_google_code(
+            code,
+            geolocation=geolocation,
+            resolution=resolution,
+            source=source,
+            fingerprint=fingerprint,
+        )
+
+    async def get_login_options(self) -> Dict[str, Any]:
+        """Get login method flags for the namespace (GET /api/auth/login-options)."""
+        return await self._auth.get_login_options()
 
     @property
     def _query(self) -> QueryService:
