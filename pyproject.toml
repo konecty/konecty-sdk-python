@@ -32,6 +32,16 @@ dependencies = [
     "pydantic>=2.11.4",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"
+
 [project.scripts]
 konecty-cli = "KonectySdkPython.cli:main"
 

@@ -29,8 +29,13 @@ Quando `success` é falso, o SDK converte a resposta em exceção `KonectyAPIErr
 | `/rest/data/{module}`                                             | DELETE | Excluir registros. Corpo: objeto com `ids` (lista de `_id` e `_updatedAt`).                                            | `delete_one` em client.py                           |
 | `/rest/menu/documents/{document_id}`                              | GET    | Obter metadados do documento (schema/menu).                                                                            | `get_document`, `get_schema` em client.py           |
 | `/rest/file/upload/ns/access/{module}/{record_code}/{field_name}` | POST   | Upload de arquivo para um campo de um registro. Multipart/form-data.                                                   | FileManager e `upload_file` em client.py            |
+| `/api/auth/google/start`                                          | GET    | Inicia o login Google (authorization code hospedado pelo Konecty). Query: `client_id`, `redirect_uri`, `state`. Responde 302 para o Google — o SDK apenas monta a URL. | `google_login_url` em client.py (não faz request)   |
+| `/api/auth/google/session`                                        | POST   | Troca o código de uso único (TTL 60s) do callback pela sessão. Corpo: `code` e telemetria opcional (`geolocation`, `resolution`, `source`, `fingerprint`). Retorna `authId` e `user`. | `exchange_google_code` em client.py                 |
+| `/api/auth/login-options`                                         | GET    | Flags de métodos de login do namespace (`passwordEnabled`, `emailOtpEnabled`, `whatsAppOtpEnabled`, `webauthnEnabled`, `webauthnRequired`, `googleEnabled`). | `get_login_options` em client.py                    |
 
 O parâmetro `module` (ou `document`) identifica o tipo de documento no Konecty (ex.: Contact, User, Setting).
+
+`GET /api/auth/google/callback` é chamado pelo Google, nunca pelo SDK: ele redireciona para o `redirect_uri` do app com `code` + `state` (ou `error` + `state`, com códigos `access_denied`, `provider_error`, `email_not_verified`, `user_not_found`, `user_inactive`, `ambiguous_user`). O `authId` nunca transita em URL — existe apenas no corpo da resposta de `POST /api/auth/google/session`.
 
 ## Parâmetros do find (GET /rest/data/{module}/find)
 
