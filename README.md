@@ -97,9 +97,29 @@ uv pip install -e ".[dev]"
 
 #### Build & Publish
 
-It is needed to increase the version number on the [pyproject](./pyproject.toml) file.
+Publishing runs from the **Publish** workflow, triggered by hand from the Actions tab
+(`Run workflow`) — no merge publishes on its own.
+
+1. Bump `version` in [pyproject.toml](./pyproject.toml) and merge it.
+2. Actions → **Publish** → `Run workflow`.
+
+The workflow runs the tests, then **fails before building if that version already exists on
+PyPI** — so a forgotten bump is a red run, never a green one that uploaded nothing. It builds
+into `dist-build/` and uploads with `uv publish`, using the `PYPI_API_TOKEN` repository secret.
+
+<details>
+<summary>Publishing manually</summary>
+
+Same PyPI endpoint (`upload.pypi.org/legacy/`) and the same kind of API token. Credentials
+come from `.pypirc`, which is gitignored and therefore local-only — this is why CI
+authenticates through a secret instead.
 
 ```sh
 uv build
 uvx twine upload --config-file .pypirc --skip-existing dist/*
 ```
+
+Note `--skip-existing`: unlike the workflow, this silently skips versions already published,
+and it is what keeps a stale local `dist/` from re-uploading old artifacts.
+
+</details>

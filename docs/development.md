@@ -24,13 +24,21 @@ O ponto de entrada do script instalável é KonectySdkPython.cli:main, registrad
 
 ## Build e publicação
 
-- **Build:** Na raiz do repositório, usar `uv build` (ou o equivalente com hatchling via pip). O build produz artefatos no diretório dist/.
-- **Versão:** Alterar a versão no pyproject.toml antes de gerar um novo build.
-- **Publicação:** Exemplo com twine: `uvx twine upload --config-file .pypirc --skip-existing dist/*` (credenciais e repositório configurados em .pypirc).
+- **Versão:** Alterar `version` no pyproject.toml antes de publicar. É a única fonte de verdade da versão — o `setup.py` na raiz está defasado e não participa do build (o backend é hatchling).
+- **Publicação (caminho normal):** workflow **Publish**, disparado à mão na aba Actions (`Run workflow`). Nenhum merge publica sozinho. O workflow roda `uv sync --extra dev`, `pytest`, consulta o PyPI e **falha antes do build se a versão do pyproject.toml já existir**, depois builda em `dist-build/` e envia com `uv publish`. Autentica pelo secret `PYPI_API_TOKEN` do repositório.
+- **Build local:** `uv build` na raiz (artefatos em dist/).
+- **Publicação manual (fallback):** `uvx twine upload --config-file .pypirc --skip-existing dist/*`. Mesmo endpoint (`upload.pypi.org/legacy/`) e mesmo tipo de API token; as credenciais vêm do `.pypirc`, que é gitignored e só existe localmente — daí o CI usar secret. Diferença de comportamento: `--skip-existing` pula em silêncio versões já publicadas, enquanto o workflow falha; e é ele que evita que um `dist/` local acumulado reenvie artefatos antigos.
 
 ## Testes
 
-O projeto não declara um runner de testes no pyproject.toml. Para rodar testes, usar o comando ou ferramenta de teste adotada pelo repositório (por exemplo pytest ou unittest), se configurado.
+O runner é o pytest, declarado no extra `dev` e configurado em `[tool.pytest.ini_options]` (testpaths `tests`, `asyncio_mode = "strict"`):
+
+```sh
+uv sync --extra dev
+uv run pytest
+```
+
+São os mesmos dois comandos que o workflow **Publish** roda como portão antes de publicar.
 
 ## Formatação e qualidade
 
