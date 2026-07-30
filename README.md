@@ -98,14 +98,14 @@ uv pip install -e ".[dev]"
 #### Build & Publish
 
 Publishing runs from the **Publish** workflow, triggered by hand from the Actions tab
-(`Run workflow`) — no merge publishes on its own.
+(`Run workflow`) — no merge publishes on its own. Pick the increment (`patch`, `minor` or
+`major`) and run it; **the version bump is part of publishing**, so there is nothing to edit
+beforehand.
 
-1. Bump `version` in [pyproject.toml](./pyproject.toml) and merge it.
-2. Actions → **Publish** → `Run workflow`.
-
-The workflow runs the tests, then **fails before building if that version already exists on
-PyPI** — so a forgotten bump is a red run, never a green one that uploaded nothing. It builds
-into `dist-build/` and uploads with `uv publish`, using the `PYPI_API_TOKEN` repository secret.
+The workflow runs the tests, bumps `version` in [pyproject.toml](./pyproject.toml), builds into
+`dist-build/` and uploads with `uv publish` (secret `PYPI_API_TOKEN`). Only after the upload
+succeeds does it commit `chore(release): <version>` and tag it — a failed upload leaves no bump
+behind claiming a release that does not exist on PyPI.
 
 <details>
 <summary>Publishing manually</summary>

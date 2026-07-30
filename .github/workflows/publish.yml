@@ -1,19 +1,43 @@
 name: Publish
 
-# Disparo manual apenas (botão "Run workflow" na aba Actions). Publicar é uma
-# decisão explícita: a versão vive no pyproject.toml e um merge na main não deve
-# empurrar release sozinho.
+# Disparo manual apenas (botão "Run workflow" na aba Actions). O bump da versão
+# faz parte da publicação: você escolhe o incremento aqui, o workflow escreve no
+# pyproject.toml, publica e só então commita/tagueia. Assim não existe o estado
+# em que alguém esquece de subir a versão e o publish morre em cima do PyPI.
 on:
     workflow_dispatch:
+        inputs:
+            bump:
+                description: 'Incremento da versão'
+                required: true
+                default: patch
+                type: choice
+                options:
+                    - patch
+                    - minor
+                    - major
+
+# Duas publicações simultâneas disputariam o mesmo push de volta na main.
+concurrency:
+    group: publish-pypi
+    cancel-in-progress: false
 
 permissions:
-    contents: read
+    contents: write
 
 jobs:
     publish:
         name: Publish to PyPI
         runs-on: ubuntu-latest
         steps:
+            # O workflow commita o bump de volta; rodar a partir de outra branch
+            # empurraria a versão nova para um lugar que não é a fonte de verdade.
+            - name: Refuse to run outside the default branch
+              if: github.ref_name != github.event.repository.default_branch
+              run: |
+                  echo "::error::Publique a partir de ${{ github.event.repository.default_branch }} — disparado em '${{ github.ref_name }}'."
+                  exit 1
+
             - name: Checkout
               uses: actions/checkout@v4
 
@@ -28,27 +52,26 @@ jobs:
             - name: Run tests
               run: uv run pytest
 
-            - name: Resolve version
+            - name: Bump version
               id: version
               run: |
                   set -euo pipefail
-                  VERSION=$(grep -m1 -E '^version = ' pyproject.toml | sed -E 's/^version = "(.*)"$/\1/')
-                  if [ -z "$VERSION" ]; then
-                    echo "::error::Não consegui ler 'version' do pyproject.toml"
-                    exit 1
-                  fi
+                  PREVIOUS=$(uv version --short)
+                  uv version --bump '${{ inputs.bump }}'
+                  VERSION=$(uv version --short)
                   echo "version=$VERSION" >>"$GITHUB_OUTPUT"
-                  echo "Publicando konecty-sdk-python $VERSION a partir de ${{ github.ref_name }}"
+                  echo "$PREVIOUS -> $VERSION (${{ inputs.bump }})"
 
-            # Falha cedo e com mensagem clara: o PyPI recusa reenvio de uma versão
-            # já publicada, e o erro cru dele não diz o que fazer.
+            # Rede de segurança: o bump automático não deveria colidir, mas se a
+            # versão anterior tiver sido publicada fora deste workflow, o PyPI
+            # recusaria o upload com um erro que não diz o que fazer.
             - name: Fail if the version is already on PyPI
               run: |
                   set -euo pipefail
                   VERSION='${{ steps.version.outputs.version }}'
                   STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/konecty-sdk-python/$VERSION/json")
                   if [ "$STATUS" = "200" ]; then
-                    echo "::error::konecty-sdk-python $VERSION já está no PyPI. Suba 'version' no pyproject.toml antes de publicar."
+                    echo "::error::konecty-sdk-python $VERSION já está no PyPI. A versão no pyproject.toml está atrás do que já foi publicado."
                     exit 1
                   fi
                   echo "Versão $VERSION ainda não publicada (HTTP $STATUS na consulta ao PyPI)."
@@ -60,6 +83,8 @@ jobs:
                   uv build --out-dir dist-build
                   ls -l dist-build
 
+            # Publica antes de commitar: se o upload falhar, a main não fica com
+            # um bump registrando uma versão que não existe no PyPI.
             - name: Publish
               env:
                   UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -70,3 +95,24 @@ jobs:
                     exit 1
                   fi
                   uv publish dist-build/*
+
+            - name: Commit and tag the release
+              run: |
+                  set -euo pipefail
+                  VERSION='${{ steps.version.outputs.version }}'
+                  git config user.name 'github-actions[bot]'
+                  git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+                  git add pyproject.toml uv.lock
+                  git commit -m "chore(release): $VERSION [skip ci]"
+                  git tag "$VERSION"
+                  git push origin "HEAD:${{ github.ref_name }}"
+                  git push origin "$VERSION"
+
+            - name: Summary
+              run: |
+                  {
+                    echo "### konecty-sdk-python ${{ steps.version.outputs.version }} publicada"
+                    echo
+                    echo "- PyPI: https://pypi.org/project/konecty-sdk-python/${{ steps.version.outputs.version }}/"
+                    echo "- Incremento: \`${{ inputs.bump }}\`"
+                  } >>"$GITHUB_STEP_SUMMARY"

@@ -24,8 +24,8 @@ O ponto de entrada do script instalável é KonectySdkPython.cli:main, registrad
 
 ## Build e publicação
 
-- **Versão:** Alterar `version` no pyproject.toml antes de publicar. É a única fonte de verdade da versão — o `setup.py` na raiz está defasado e não participa do build (o backend é hatchling).
-- **Publicação (caminho normal):** workflow **Publish**, disparado à mão na aba Actions (`Run workflow`). Nenhum merge publica sozinho. O workflow roda `uv sync --extra dev`, `pytest`, consulta o PyPI e **falha antes do build se a versão do pyproject.toml já existir**, depois builda em `dist-build/` e envia com `uv publish`. Autentica pelo secret `PYPI_API_TOKEN` do repositório.
+- **Publicação (caminho normal):** workflow **Publish**, disparado à mão na aba Actions (`Run workflow`), escolhendo o incremento (`patch`, `minor` ou `major`). Nenhum merge publica sozinho e **não é preciso editar a versão antes** — o bump faz parte da publicação. Sequência: `uv sync --extra dev` → `pytest` → `uv version --bump` → build em `dist-build/` → `uv publish` (secret `PYPI_API_TOKEN`) → só então `chore(release): <versão>` commitado e taggeado. A ordem é deliberada: upload que falha não deixa na main um bump anunciando versão que não existe no PyPI.
+- **Versão:** vive só em `version` no pyproject.toml, escrita pelo workflow. O `setup.py` na raiz está defasado e não participa do build (o backend é hatchling).
 - **Build local:** `uv build` na raiz (artefatos em dist/).
 - **Publicação manual (fallback):** `uvx twine upload --config-file .pypirc --skip-existing dist/*`. Mesmo endpoint (`upload.pypi.org/legacy/`) e mesmo tipo de API token; as credenciais vêm do `.pypirc`, que é gitignored e só existe localmente — daí o CI usar secret. Diferença de comportamento: `--skip-existing` pula em silêncio versões já publicadas, enquanto o workflow falha; e é ele que evita que um `dist/` local acumulado reenvie artefatos antigos.
 
