@@ -13,6 +13,22 @@ class KonectyAPIError(KonectyError):
     pass
 
 
+class KonectyGoogleSessionError(KonectyAPIError):
+    """
+    Raised by exchange_google_code. Carries the machine-readable ``code`` from
+    ``errors[0].code`` so callers can branch or translate without parsing the
+    message; ``failed`` covers unreadable or unrecognised bodies.
+
+    Subclasses KonectyAPIError so existing ``except KonectyAPIError`` keeps working.
+
+    Mirrors KonectyGoogleSessionError in the TypeScript SDK — keep both in sync.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 class KonectyValidationError(KonectyError):
     """Raised for validation errors."""
 

@@ -3,7 +3,7 @@
 from typing import Any, Dict, Optional, Union
 from urllib.parse import quote, urlencode
 
-from ..exceptions import KonectyAPIError
+from ..exceptions import KonectyAPIError, KonectyGoogleSessionError
 from .base import BaseService
 
 GOOGLE_START_PATH = "/api/auth/google/start"
@@ -13,6 +13,29 @@ GOOGLE_START_PATH = "/api/auth/google/start"
 _ENCODE_URI_COMPONENT_SAFE = "!*'()"
 GOOGLE_SESSION_PATH = "/api/auth/google/session"
 LOGIN_OPTIONS_PATH = "/api/auth/login-options"
+
+
+_GOOGLE_SESSION_ERROR_CODES = (
+    "invalid_code",
+    "expired_code",
+    "user_not_found",
+    "user_inactive",
+)
+
+
+def _first_error_code(error: KonectyAPIError) -> str:
+    """
+    Extract the first recognised ``errors[].code``; ``failed`` when there is none.
+
+    Same set and same fallback as the TypeScript SDK, so both raise the same code
+    for the same response.
+    """
+    errors = error.args[0] if error.args else None
+    if isinstance(errors, list):
+        for item in errors:
+            if isinstance(item, dict) and item.get("code") in _GOOGLE_SESSION_ERROR_CODES:
+                return str(item["code"])
+    return "failed"
 
 
 def _first_error_message(error: KonectyAPIError) -> str:
@@ -74,8 +97,10 @@ class AuthService(BaseService):
         POST /api/auth/google/session. Exchanges the single-use code (TTL 60s) for a session.
 
         On success the returned authId is adopted by the client, so following requests
-        are authenticated. On error raises KonectyAPIError with errors[0].message and
-        leaves the client authentication state untouched.
+        are authenticated. On error raises KonectyGoogleSessionError — errors[0].message
+        as the message plus the machine-readable ``code`` — and leaves the client
+        authentication state untouched. The error subclasses KonectyAPIError, so callers
+        catching that keep working.
         """
         payload: Dict[str, Any] = {"code": code}
         if geolocation is not None:
@@ -90,11 +115,15 @@ class AuthService(BaseService):
         try:
             response = await self._post(GOOGLE_SESSION_PATH, json=payload)
         except KonectyAPIError as error:
-            raise KonectyAPIError(_first_error_message(error)) from error
+            raise KonectyGoogleSessionError(
+                _first_error_code(error), _first_error_message(error)
+            ) from error
 
         auth_id = response.get("authId") if isinstance(response, dict) else None
         if not isinstance(auth_id, str) or not auth_id:
-            raise KonectyAPIError("Google session response has no authId")
+            raise KonectyGoogleSessionError(
+                "failed", "Google session response has no authId"
+            )
 
         self._client.set_auth_id(auth_id)
         return response

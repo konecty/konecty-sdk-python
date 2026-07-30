@@ -3,7 +3,7 @@
 import pytest
 
 from KonectySdkPython.lib.client import KonectyClient
-from KonectySdkPython.lib.exceptions import KonectyAPIError
+from KonectySdkPython.lib.exceptions import KonectyAPIError, KonectyGoogleSessionError
 
 FAKE_AUTH_ID = "fake-auth-id-not-a-real-token"
 FAKE_CODE = "fake-single-use-code"
@@ -180,8 +180,46 @@ async def test_exchange_google_code_raises_first_error_and_keeps_client_anonymou
         await client.exchange_google_code(FAKE_CODE)
 
     assert str(exc_info.value) == "Session code is invalid or already used"
+    # Paridade com o SDK TypeScript (KonectyGoogleSessionError.code): o código
+    # legível por máquina acompanha o erro, para o caller ramificar/traduzir sem
+    # parsear a mensagem — e é o do primeiro erro reconhecido, não o do segundo.
+    assert isinstance(exc_info.value, KonectyGoogleSessionError)
+    assert exc_info.value.code == "invalid_code"
     assert client.auth_id is None
     assert client.headers["Authorization"] == ""
+
+
+@pytest.mark.asyncio
+async def test_exchange_google_code_falls_back_to_failed_code(stub_server) -> None:
+    """Corpo sem código reconhecível vira `failed`, como no SDK TypeScript."""
+    stub_server.route(
+        "POST",
+        "/api/auth/google/session",
+        {"success": False, "errors": [{"message": "Boom", "code": "something_else"}]},
+        status=500,
+    )
+    client = KonectyClient(stub_server.base_url)
+
+    with pytest.raises(KonectyGoogleSessionError) as exc_info:
+        await client.exchange_google_code(FAKE_CODE)
+
+    assert exc_info.value.code == "failed"
+    assert str(exc_info.value) == "Boom"
+
+
+@pytest.mark.asyncio
+async def test_google_session_error_is_catchable_as_api_error(stub_server) -> None:
+    """Quem já capturava KonectyAPIError continua capturando: é subclasse."""
+    stub_server.route(
+        "POST",
+        "/api/auth/google/session",
+        {"success": False, "errors": [{"message": "Inactive", "code": "user_inactive"}]},
+        status=400,
+    )
+    client = KonectyClient(stub_server.base_url)
+
+    with pytest.raises(KonectyAPIError):
+        await client.exchange_google_code(FAKE_CODE)
 
 
 @pytest.mark.asyncio
