@@ -1,0 +1,72 @@
+name: Publish
+
+# Disparo manual apenas (botão "Run workflow" na aba Actions). Publicar é uma
+# decisão explícita: a versão vive no pyproject.toml e um merge na main não deve
+# empurrar release sozinho.
+on:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    publish:
+        name: Publish to PyPI
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup uv
+              uses: astral-sh/setup-uv@v5
+              with:
+                  enable-cache: true
+
+            - name: Install dependencies
+              run: uv sync --extra dev
+
+            - name: Run tests
+              run: uv run pytest
+
+            - name: Resolve version
+              id: version
+              run: |
+                  set -euo pipefail
+                  VERSION=$(grep -m1 -E '^version = ' pyproject.toml | sed -E 's/^version = "(.*)"$/\1/')
+                  if [ -z "$VERSION" ]; then
+                    echo "::error::Não consegui ler 'version' do pyproject.toml"
+                    exit 1
+                  fi
+                  echo "version=$VERSION" >>"$GITHUB_OUTPUT"
+                  echo "Publicando konecty-sdk-python $VERSION a partir de ${{ github.ref_name }}"
+
+            # Falha cedo e com mensagem clara: o PyPI recusa reenvio de uma versão
+            # já publicada, e o erro cru dele não diz o que fazer.
+            - name: Fail if the version is already on PyPI
+              run: |
+                  set -euo pipefail
+                  VERSION='${{ steps.version.outputs.version }}'
+                  STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/konecty-sdk-python/$VERSION/json")
+                  if [ "$STATUS" = "200" ]; then
+                    echo "::error::konecty-sdk-python $VERSION já está no PyPI. Suba 'version' no pyproject.toml antes de publicar."
+                    exit 1
+                  fi
+                  echo "Versão $VERSION ainda não publicada (HTTP $STATUS na consulta ao PyPI)."
+
+            - name: Build
+              run: |
+                  set -euo pipefail
+                  rm -rf dist-build
+                  uv build --out-dir dist-build
+                  ls -l dist-build
+
+            - name: Publish
+              env:
+                  UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  if [ -z "${UV_PUBLISH_TOKEN:-}" ]; then
+                    echo "::error::Secret PYPI_API_TOKEN não configurado no repositório."
+                    exit 1
+                  fi
+                  uv publish dist-build/*
