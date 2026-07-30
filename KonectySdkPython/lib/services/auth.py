@@ -1,12 +1,16 @@
 """Auth API: Google hosted authorization code flow and login options."""
 
 from typing import Any, Dict, Optional, Union
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from ..exceptions import KonectyAPIError
 from .base import BaseService
 
 GOOGLE_START_PATH = "/api/auth/google/start"
+# Conjunto que `encodeURIComponent` deixa passar além de [A-Za-z0-9_.-~], que o
+# `quote` já preserva por padrão. Usado para que a URL montada aqui seja
+# byte a byte igual à do SDK TypeScript — ver `_encode_query` abaixo.
+_ENCODE_URI_COMPONENT_SAFE = "!*'()"
 GOOGLE_SESSION_PATH = "/api/auth/google/session"
 LOGIN_OPTIONS_PATH = "/api/auth/login-options"
 
@@ -21,6 +25,17 @@ def _first_error_message(error: KonectyAPIError) -> str:
             if isinstance(message, str) and message:
                 return message
     return str(error)
+
+
+def _encode_query(params: list) -> str:
+    """
+    Codifica o query string como `encodeURIComponent` do SDK TypeScript.
+
+    O default do `urlencode` é `quote_plus`, que transforma espaço em `+`;
+    `encodeURIComponent` produz `%20`. Os dois decodificam para o mesmo valor no
+    servidor, mas a spec pede URLs idênticas entre os SDKs.
+    """
+    return urlencode(params, quote_via=quote, safe=_ENCODE_URI_COMPONENT_SAFE)
 
 
 class AuthService(BaseService):
@@ -44,7 +59,7 @@ class AuthService(BaseService):
         if state is not None:
             params.append(("state", state))
         base_url = self._client.base_url.rstrip("/")
-        return f"{base_url}{GOOGLE_START_PATH}?{urlencode(params)}"
+        return f"{base_url}{GOOGLE_START_PATH}?{_encode_query(params)}"
 
     async def exchange_google_code(
         self,

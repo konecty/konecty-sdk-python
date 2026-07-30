@@ -49,8 +49,44 @@ def test_google_login_url_builds_encoded_absolute_url() -> None:
         "https://example.konecty.com/api/auth/google/start"
         "?client_id=my-app"
         "&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback"
-        "&state=a+b%26c%3Dd%2F%C3%A9%3F"
+        "&state=a%20b%26c%3Dd%2F%C3%A9%3F"
     )
+
+
+def test_google_login_url_encoding_matches_the_typescript_sdk() -> None:
+    """
+    Byte-for-byte parity with `getGoogleLoginUrl` do @konecty/sdk.
+
+    Mesma entrada e mesma saída esperada do teste
+    `src/__test__/api/googleLogin.test.ts` no SDK TypeScript. O ponto sensível é
+    o espaço: `urlencode` usa `quote_plus` por padrão e o transformaria em `+`,
+    enquanto `encodeURIComponent` produz `%20`. Os dois decodificam para o mesmo
+    valor num query string, mas a spec pede URLs idênticas entre os SDKs — e um
+    `state` comparado como string crua em qualquer app consumidor divergiria.
+    """
+    client = KonectyClient("http://localhost:3000")
+
+    url = client.google_login_url(
+        client_id="my app",
+        redirect_uri="https://app.example.invalid/auth/callback?tenant=acme",
+        state="a b&c=d/e?f#g+h",
+    )
+
+    assert url == (
+        "http://localhost:3000/api/auth/google/start"
+        "?client_id=my%20app"
+        "&redirect_uri=https%3A%2F%2Fapp.example.invalid%2Fauth%2Fcallback%3Ftenant%3Dacme"
+        "&state=a%20b%26c%3Dd%2Fe%3Ff%23g%2Bh"
+    )
+
+
+def test_google_login_url_leaves_encodeuricomponent_safe_chars_intact() -> None:
+    """`!*'()~` não são escapados por `encodeURIComponent`; aqui também não."""
+    client = KonectyClient("http://localhost:3000")
+
+    url = client.google_login_url(client_id="app", state="~!*'()")
+
+    assert url.endswith("&state=~!*'()")
 
 
 def test_google_login_url_omits_absent_optional_params() -> None:
