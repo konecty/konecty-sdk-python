@@ -74,7 +74,9 @@ O corpo contém:
 - **ids:** lista de objetos com `_id` (identificador do registro) e `_updatedAt` (data da última atualização no formato Konecty `$date`). O Konecty usa isso para controle de concorrência.
 - **data:** objeto com apenas os campos a serem atualizados.
 
-O SDK não envia no `data` os campos em `KONECTY_UPDATE_IGNORE_FIELDS` (\_id, code, \_updatedAt, \_createdAt, \_updatedBy, \_createdBy). O tipo `KonectyUpdateId` e `KonectyDateTime` em types.py garantem o formato correto.
+O SDK não envia no `data` os campos em `KONECTY_UPDATE_IGNORE_FIELDS` (\_id, code, \_updatedAt, \_createdAt, \_createdBy). O tipo `KonectyUpdateId` e `KonectyDateTime` em types.py garantem o formato correto.
+
+`_updatedBy` **é enviado**: no update ele é a sobrescrita de autoria aceita pelo backend para chamadas admin — `{"_updatedBy": {"_id": "<userId>"}}` credita a escrita (e o histórico) àquele usuário, em vez do dono do token. Serve para automações que concluem um registro em nome de quem o executou de fato. Vindo de um chamador não-admin, o Konecty ignora o campo. No create ele continua sendo removido (o backend não aceita sobrescrita de autoria na criação).
 
 ## Exclusão (DELETE)
 

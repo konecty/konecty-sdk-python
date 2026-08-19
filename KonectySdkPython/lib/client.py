@@ -31,12 +31,15 @@ logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 
 logger = logging.getLogger(__name__)
 
+# `_updatedBy` is NOT stripped: the backend accepts it on update as an explicit
+# authorship override for admin callers (automations crediting a write to the user
+# it acted on behalf of). Non-admin callers have it ignored server-side, so letting
+# it through costs nothing. See "Autoria da escrita" in docs/pt-BR/api.md (konecty/Konecty).
 KONECTY_UPDATE_IGNORE_FIELDS = [
     "_id",
     "code",
     "_updatedAt",
     "_createdAt",
-    "_updatedBy",
     "_createdBy",
 ]
 KONECTY_CREATE_IGNORE_FIELDS = ["_updatedAt", "_createdAt", "_updatedBy", "_createdBy"]

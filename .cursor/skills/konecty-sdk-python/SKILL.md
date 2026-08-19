@@ -48,6 +48,7 @@ From `KonectySdkPython.lib` the same symbols are available; from `KonectySdkPyth
 - **Create:** `create(module: str, data: KonectyDict) -> Optional[KonectyDict]`. Do not send \_createdAt, \_updatedAt, \_createdBy, \_updatedBy; SDK strips them.
 - **Update one:** `update_one(module, id, updatedAt: datetime, data: KonectyDict)`. Requires current \_updatedAt for concurrency.
 - **Update many:** `update(module, ids: list[KonectyUpdateId], data: KonectyDict) -> list[KonectyDict]`. Each id is dict with \_id and \_updatedAt (use `KonectyUpdateId.from_dict`).
+- **Authorship override (update only):** send `_updatedBy={"_id": user_id}` in `data` to credit the write (and its history) to another user — the backend honours it for admin callers and ignores it otherwise. The SDK strips the other system fields (\_id, code, \_updatedAt, \_createdAt, \_createdBy) from update payloads, and strips `_updatedBy` too on create.
 - **Delete:** `delete_one(module, id, updatedAt: datetime)`.
 - **Document/schema:** `get_document(document_id)`, `get_schema(document_id)` — return metadata for a document type.
 - **Settings:** `get_setting(key)`, `get_settings(keys)` async; `get_setting_sync(key)`, `get_settings_sync(keys)` sync. They query the Setting module.
