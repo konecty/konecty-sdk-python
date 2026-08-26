@@ -82,8 +82,14 @@ async def test_create_pat_raises_on_forbidden_role(stub_server) -> None:
         status=403,
     )
 
-    with pytest.raises(KonectyAPIError):
+    with pytest.raises(
+        KonectyAPIError, match="User role is not allowed to create Personal Access Tokens"
+    ):
         await _client(stub_server).create_pat("blocked")
+
+    request = stub_server.requests[0]
+    assert request["method"] == "POST"
+    assert request["path"] == "/rest/auth/pat"
 
 
 @pytest.mark.asyncio
@@ -148,5 +154,9 @@ async def test_revoke_pat_raises_not_found_for_unknown_id(stub_server) -> None:
         status=404,
     )
 
-    with pytest.raises(KonectyAPIError):
+    with pytest.raises(KonectyAPIError, match="Personal Access Token not found"):
         await _client(stub_server).revoke_pat("unknown")
+
+    request = stub_server.requests[0]
+    assert request["method"] == "DELETE"
+    assert request["path"] == "/rest/auth/pat/unknown"

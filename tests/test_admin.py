@@ -76,8 +76,12 @@ async def test_list_all_pats_raises_forbidden_for_non_admin(stub_server) -> None
         status=403,
     )
 
-    with pytest.raises(KonectyAPIError):
+    with pytest.raises(KonectyAPIError, match="Admin access required"):
         await _client(stub_server).list_all_pats()
+
+    request = stub_server.requests[0]
+    assert request["method"] == "GET"
+    assert request["path"] == "/api/admin/pats"
 
 
 @pytest.mark.asyncio
@@ -106,8 +110,12 @@ async def test_revoke_user_pat_raises_not_found(stub_server) -> None:
         status=404,
     )
 
-    with pytest.raises(KonectyAPIError):
+    with pytest.raises(KonectyAPIError, match="PAT not found"):
         await _client(stub_server).revoke_user_pat("user-1", "unknown")
+
+    request = stub_server.requests[0]
+    assert request["method"] == "DELETE"
+    assert request["path"] == "/api/admin/pats/user-1/unknown"
 
 
 @pytest.mark.asyncio
@@ -205,8 +213,12 @@ async def test_create_service_account_raises_conflict_on_duplicate_username(
         status=409,
     )
 
-    with pytest.raises(KonectyAPIError):
+    with pytest.raises(KonectyAPIError, match="Username already in use"):
         await _client(stub_server).create_service_account("Bot", "taken")
+
+    request = stub_server.requests[0]
+    assert request["method"] == "POST"
+    assert request["path"] == "/api/admin/service-accounts"
 
 
 @pytest.mark.asyncio
@@ -270,8 +282,12 @@ async def test_update_service_account_access_raises_not_found(stub_server) -> No
         status=404,
     )
 
-    with pytest.raises(KonectyAPIError):
+    with pytest.raises(KonectyAPIError, match="Service account not found"):
         await _client(stub_server).update_service_account_access("unknown", {})
+
+    request = stub_server.requests[0]
+    assert request["method"] == "PUT"
+    assert request["path"] == "/api/admin/service-accounts/unknown/access"
 
 
 @pytest.mark.asyncio
@@ -336,5 +352,9 @@ async def test_create_service_account_pat_raises_for_non_service_account_target(
         status=403,
     )
 
-    with pytest.raises(KonectyAPIError):
+    with pytest.raises(KonectyAPIError, match="target is not a service account"):
         await _client(stub_server).create_service_account_pat("human-1", "nope")
+
+    request = stub_server.requests[0]
+    assert request["method"] == "POST"
+    assert request["path"] == "/api/admin/service-accounts/human-1/pats"
