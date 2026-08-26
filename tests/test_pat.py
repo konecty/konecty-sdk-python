@@ -23,6 +23,10 @@ def _client(stub_server) -> KonectyClient:
 
 @pytest.mark.asyncio
 async def test_create_pat_sends_name_only_when_no_expiry(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/pat.test.ts:46 — describe('createPat'),
+    it('Should omit expiresAt from the body when not given').
+    """
     stub_server.route(
         "POST",
         "/rest/auth/pat",
@@ -41,6 +45,11 @@ async def test_create_pat_sends_name_only_when_no_expiry(stub_server) -> None:
 
 @pytest.mark.asyncio
 async def test_create_pat_sends_expires_at_when_given(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/pat.test.ts:13 — describe('createPat'),
+    it('Should POST to /rest/auth/pat with name and expiresAt, and return the
+    show-once token').
+    """
     stub_server.route(
         "POST",
         "/rest/auth/pat",
@@ -59,6 +68,10 @@ async def test_create_pat_sends_expires_at_when_given(stub_server) -> None:
 
 @pytest.mark.asyncio
 async def test_create_pat_raises_on_forbidden_role(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/pat.test.ts:66 — describe('createPat'),
+    it('Should return the server errors verbatim on a 403 (role not allowed)').
+    """
     stub_server.route(
         "POST",
         "/rest/auth/pat",
@@ -75,6 +88,10 @@ async def test_create_pat_raises_on_forbidden_role(stub_server) -> None:
 
 @pytest.mark.asyncio
 async def test_list_pats_returns_data_without_hashed_token(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/pat.test.ts:95 — describe('listPats'),
+    it('Should GET /rest/auth/pat and return the list without hashedToken').
+    """
     stub_server.route(
         "GET",
         "/rest/auth/pat",
@@ -103,6 +120,10 @@ async def test_list_pats_returns_data_without_hashed_token(stub_server) -> None:
 
 @pytest.mark.asyncio
 async def test_revoke_pat_builds_path_with_id(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/pat.test.ts:135 — describe('revokePat'),
+    it('Should DELETE /rest/auth/pat/:id').
+    """
     stub_server.route("DELETE", "/rest/auth/pat/pat-1", {"success": True})
 
     result = await _client(stub_server).revoke_pat("pat-1")
@@ -115,6 +136,11 @@ async def test_revoke_pat_builds_path_with_id(stub_server) -> None:
 
 @pytest.mark.asyncio
 async def test_revoke_pat_raises_not_found_for_unknown_id(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/pat.test.ts:159 — describe('revokePat'),
+    it('Should return the 404 not-found error verbatim when the PAT does not
+    belong to the caller').
+    """
     stub_server.route(
         "DELETE",
         "/rest/auth/pat/unknown",
