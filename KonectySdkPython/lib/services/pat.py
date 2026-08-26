@@ -13,7 +13,13 @@ PAT_PATH = "/rest/auth/pat"
 
 
 class PatService(BaseService):
-    """Service for the caller's own Personal Access Tokens."""
+    """Service for the caller's own Personal Access Tokens.
+
+    `pat_id` below is a server-generated identifier (Mongo-style hex id) —
+    interpolated raw into the path with an f-string, no percent-encoding, matching
+    the TS SDK's equivalent path-templating in pat.ts. It is never free-form user
+    input.
+    """
 
     async def create_pat(
         self, name: str, *, expires_at: Optional[str] = None

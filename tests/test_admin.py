@@ -136,6 +136,30 @@ async def test_revoke_legacy_token_interpolates_user_id_and_fingerprint(
 
 
 @pytest.mark.asyncio
+async def test_revoke_legacy_token_interpolates_fingerprint_with_hyphens(
+    stub_server,
+) -> None:
+    """
+    Documents (does not newly enforce) that ids/fingerprints are interpolated raw,
+    with no percent-encoding — see the note on AdminService. A hyphenated
+    fingerprint, a legitimate server-generated shape, must reach the backend
+    byte-for-byte in the path.
+    """
+    stub_server.route(
+        "DELETE",
+        "/api/admin/legacy-tokens/user-2/ab12-cd34-ef56",
+        {"success": True, "data": {"success": True}},
+    )
+
+    result = await _client(stub_server).revoke_legacy_token("user-2", "ab12-cd34-ef56")
+
+    assert result["success"] is True
+    request = stub_server.requests[0]
+    assert request["method"] == "DELETE"
+    assert request["path"] == "/api/admin/legacy-tokens/user-2/ab12-cd34-ef56"
+
+
+@pytest.mark.asyncio
 async def test_create_service_account_sends_name_username_and_access_map(
     stub_server,
 ) -> None:

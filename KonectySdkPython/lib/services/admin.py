@@ -15,7 +15,14 @@ ADMIN_SERVICE_ACCOUNTS_PATH = "/api/admin/service-accounts"
 
 
 class AdminService(BaseService):
-    """Service for namespace-wide credential and Service Account administration."""
+    """Service for namespace-wide credential and Service Account administration.
+
+    `user_id`/`pat_id`/`fingerprint`/`service_account_id` below are server-generated
+    identifiers (Mongo-style hex ids or slug-like alphanumeric/hyphen strings) —
+    interpolated raw into the path with an f-string, no percent-encoding, matching
+    the TS SDK's equivalent path-templating in adminCredentials.ts/
+    adminServiceAccounts.ts. They are never free-form user input.
+    """
 
     async def list_all_pats(self) -> Dict[str, Any]:
         """GET /api/admin/pats. Returns `data`: {pats: [...], legacyTokens: [...]} for the whole namespace."""
