@@ -14,6 +14,7 @@ from .filters import KonectyFilter, KonectyFindParams
 from .http import StreamResponse
 from .http import request as _http_request
 from .serialization import json_serial
+from .services.admin import AdminService
 from .services.aggregation import AggregationService
 from .services.auth import AuthService
 from .services.change_user import ChangeUserService
@@ -446,6 +447,61 @@ class KonectyClient:
     async def revoke_pat(self, pat_id: str) -> Dict[str, Any]:
         """Revoke one of the caller's own Personal Access Tokens (DELETE /rest/auth/pat/{pat_id})."""
         return await self._pat.revoke_pat(pat_id)
+
+    @property
+    def _admin(self) -> AdminService:
+        if not hasattr(self, "_admin_service"):
+            self._admin_service = AdminService(self)
+        return self._admin_service
+
+    async def admin_list_all_pats(self) -> Dict[str, Any]:
+        """Admin: list every PAT and legacy perpetual token in the namespace (GET /api/admin/pats)."""
+        return await self._admin.list_all_pats()
+
+    async def admin_revoke_pat(self, user_id: str, pat_id: str) -> Dict[str, Any]:
+        """Admin: revoke a PAT belonging to any user (DELETE /api/admin/pats/{user_id}/{pat_id})."""
+        return await self._admin.revoke_pat(user_id, pat_id)
+
+    async def admin_revoke_legacy_token(self, user_id: str, fingerprint: str) -> Dict[str, Any]:
+        """Admin: revoke a legacy perpetual token by fingerprint (DELETE /api/admin/legacy-tokens/{user_id}/{fingerprint})."""
+        return await self._admin.revoke_legacy_token(user_id, fingerprint)
+
+    async def admin_create_service_account(
+        self,
+        name: str,
+        username: str,
+        access_map: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Admin: create a Service Account with a sovereign access map (POST /api/admin/service-accounts).
+
+        `access_map` maps document name -> 'read' | 'readWrite'.
+        """
+        return await self._admin.create_service_account(name, username, access_map)
+
+    async def admin_list_service_accounts(self) -> Dict[str, Any]:
+        """Admin: list every Service Account and its PATs (GET /api/admin/service-accounts)."""
+        return await self._admin.list_service_accounts()
+
+    async def admin_update_service_account_access(
+        self, service_account_id: str, access_map: Dict[str, str]
+    ) -> Dict[str, Any]:
+        """Admin: replace a Service Account's access map (PUT /api/admin/service-accounts/{id}/access)."""
+        return await self._admin.update_service_account_access(
+            service_account_id, access_map
+        )
+
+    async def admin_create_service_account_pat(
+        self,
+        service_account_id: str,
+        name: str,
+        *,
+        expires_at: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Admin: mint a PAT on behalf of a Service Account (POST /api/admin/service-accounts/{id}/pats)."""
+        return await self._admin.create_service_account_pat(
+            service_account_id, name, expires_at=expires_at
+        )
 
     @property
     def _query(self) -> QueryService:
