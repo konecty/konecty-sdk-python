@@ -21,6 +21,7 @@ from .services.comments import CommentsService
 from .services.export import ExportService
 from .services.files import FilesService
 from .services.notifications import NotificationsService
+from .services.pat import PatService
 from .services.query import QueryResult, QueryService
 from .services.stream import FindStreamResult, StreamService
 from .services.subscriptions import SubscriptionsService
@@ -419,6 +420,32 @@ class KonectyClient:
     async def get_login_options(self) -> Dict[str, Any]:
         """Get login method flags for the namespace (GET /api/auth/login-options)."""
         return await self._auth.get_login_options()
+
+    @property
+    def _pat(self) -> PatService:
+        if not hasattr(self, "_pat_service"):
+            self._pat_service = PatService(self)
+        return self._pat_service
+
+    async def create_pat(
+        self, name: str, *, expires_at: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a Personal Access Token for the caller (POST /rest/auth/pat).
+
+        Requires a session/OAuth authentication (a PAT cannot mint another PAT). The
+        plaintext token is only ever returned here — save it now, it is not recoverable
+        afterwards. `expires_at` is an ISO date string; omit for a PAT that never expires.
+        """
+        return await self._pat.create_pat(name, expires_at=expires_at)
+
+    async def list_pats(self) -> Dict[str, Any]:
+        """List the caller's own Personal Access Tokens (GET /rest/auth/pat)."""
+        return await self._pat.list_pats()
+
+    async def revoke_pat(self, pat_id: str) -> Dict[str, Any]:
+        """Revoke one of the caller's own Personal Access Tokens (DELETE /rest/auth/pat/{pat_id})."""
+        return await self._pat.revoke_pat(pat_id)
 
     @property
     def _query(self) -> QueryService:
