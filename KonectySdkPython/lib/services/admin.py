@@ -38,17 +38,18 @@ class AdminService(BaseService):
         access_map: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """
-        POST /api/admin/service-accounts. Wire body: {name, username, accessMap}.
+        POST /api/admin/service-accounts. Wire body: {name, username, accessMap?}.
 
-        `access_map` maps document name -> 'read' | 'readWrite'; an empty/omitted map
-        means no access to anything. Returns `data`: {_id, username, role, access,
-        mcpRoleHint?} — 201 on success, 409 if the username is already in use.
+        `access_map` maps document name -> 'read' | 'readWrite'; when omitted the
+        `accessMap` key itself is left out of the request body (matching the TS SDK,
+        which passes `accessMap: undefined` and drops it on `JSON.stringify`) — the
+        backend treats a missing map the same as an empty one: no access to anything.
+        Returns `data`: {_id, username, role, access, mcpRoleHint?} — 201 on success,
+        409 if the username is already in use.
         """
-        payload: Dict[str, Any] = {
-            "name": name,
-            "username": username,
-            "accessMap": access_map or {},
-        }
+        payload: Dict[str, Any] = {"name": name, "username": username}
+        if access_map is not None:
+            payload["accessMap"] = access_map
         return await self._post(ADMIN_SERVICE_ACCOUNTS_PATH, json=payload)
 
     async def list_service_accounts(self) -> Dict[str, Any]:

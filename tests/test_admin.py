@@ -163,9 +163,20 @@ async def test_create_service_account_sends_name_username_and_access_map(
 
 
 @pytest.mark.asyncio
-async def test_create_service_account_defaults_access_map_to_empty_dict(
+async def test_create_service_account_omits_access_map_when_none(
     stub_server,
 ) -> None:
+    """
+    Equivalent TS test: src/__test__/api/adminServiceAccounts.test.ts —
+    describe('createServiceAccount') > it('Should omit accessMap from the body
+    when not given').
+
+    Parity with the TS SDK: when `access_map` is omitted, `createServiceAccount`
+    passes `accessMap: undefined`, which `JSON.stringify` drops from the wire body
+    entirely. The Python SDK mirrors that by leaving the `accessMap` key out of
+    the payload rather than sending an explicit `{}` (see
+    KonectySdkPython/lib/services/admin.py::create_service_account).
+    """
     stub_server.route(
         "POST",
         "/api/admin/service-accounts",
@@ -178,8 +189,8 @@ async def test_create_service_account_defaults_access_map_to_empty_dict(
     assert stub_server.requests[0]["json"] == {
         "name": "Bot 2",
         "username": "svc-bot-2",
-        "accessMap": {},
     }
+    assert "accessMap" not in stub_server.requests[0]["json"]
 
 
 @pytest.mark.asyncio
