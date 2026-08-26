@@ -4,10 +4,9 @@ Mirrors POST/GET/DELETE /rest/auth/pat (backend: `src/server/routes/rest/auth/pa
 Konecty core repo). Asserts URL and JSON body byte-for-byte, same as the other services'
 tests in this repo (see `tests/test_auth_google.py`).
 
-Parity note: at the time these tests were written the TypeScript SDK (`konecty/konecty-sdk`)
-had not yet implemented the PAT domain — no `src/__test__/api/pat.test.ts` exists there.
-Per the repo's parity rule (AGENTS.md "SDKs"), once that test lands it must assert the same
-input/output as the tests below (same wire body field names: `name`, `expiresAt`).
+Parity with the TypeScript SDK (`konecty/konecty-sdk`, branch `feat/pat-service-accounts`):
+`src/__test__/api/pat.test.ts` (`createPat`, `listPats`, `revokePat` describe blocks) asserts
+the same input/output as the tests below — same wire body field names (`name`, `expiresAt`).
 """
 
 import pytest

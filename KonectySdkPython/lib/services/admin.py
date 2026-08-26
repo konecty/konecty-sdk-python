@@ -21,7 +21,7 @@ class AdminService(BaseService):
         """GET /api/admin/pats. Returns `data`: {pats: [...], legacyTokens: [...]} for the whole namespace."""
         return await self._get(ADMIN_PATS_PATH)
 
-    async def revoke_pat(self, user_id: str, pat_id: str) -> Dict[str, Any]:
+    async def revoke_user_pat(self, user_id: str, pat_id: str) -> Dict[str, Any]:
         """DELETE /api/admin/pats/{user_id}/{pat_id}. Revokes a PAT belonging to any user."""
         path = f"{ADMIN_PATS_PATH}/{user_id}/{pat_id}"
         return await self._delete(path)

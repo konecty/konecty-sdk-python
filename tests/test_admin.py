@@ -6,11 +6,30 @@ credentials.ts` and `src/server/routes/api/admin/serviceAccounts.ts`, Konecty co
 Asserts URL (including path-segment interpolation for `:userId`/`:patId`/`:fingerprint`/
 `:id`) and JSON body byte-for-byte, same pattern as `tests/test_pat.py`.
 
-Parity note: at the time these tests were written the TypeScript SDK (`konecty/konecty-sdk`)
-had not yet implemented the admin domain — no `src/__test__/api/admin.test.ts` exists there.
-Per the repo's parity rule (AGENTS.md "SDKs"), once that test lands it must assert the same
-input/output as the tests below (same wire body field names: `name`, `username`, `accessMap`,
-`expiresAt`; same path shape for the four id-bearing routes).
+Naming: every method here matches its `docs/features.json` sdk.python id with the
+`admin.` prefix dropped (`list_all_pats`, `revoke_legacy_token`, `create_service_account`,
+`list_service_accounts`, `update_service_account_access`, `create_service_account_pat`),
+same convention as the self-service PAT methods in `tests/test_pat.py`. The one exception
+is `revoke_user_pat`: flattening `admin.revoke_pat` straight to `revoke_pat` would collide
+with the self-service `KonectyClient.revoke_pat` (different resource — `user_id` + `pat_id`
+here vs. a caller-scoped `pat_id` there) — so it keeps a disambiguating name, per the
+cross-SDK parity decision.
+
+Parity with the TypeScript SDK (`konecty/konecty-sdk`, branch `feat/pat-service-accounts`):
+- `src/__test__/api/pat.test.ts` — self-service PAT (see `tests/test_pat.py` instead).
+- `src/__test__/api/adminCredentials.test.ts` — `listAllPats`, `revokeLegacyToken`, and the
+  admin PAT-revoke describe block (see note below).
+- `src/__test__/api/adminServiceAccounts.test.ts` — `createServiceAccount`,
+  `listServiceAccounts`, `updateServiceAccountAccess`, `createServiceAccountPat`.
+
+Naming discrepancy found while wiring this parity (flagging per AGENTS.md "verifique, não
+chute" rather than silently picking one): `docs/features.json` in the Konecty core repo
+maps `admin.pats.revoke` to `admin.revokeUserPat` / `admin.revoke_user_pat`, which is what
+this file follows for `revoke_user_pat`. But the TypeScript SDK code actually checked out
+locally (konecty-sdk, commit b50e33a on `feat/pat-service-accounts`) still names the method
+`adminRevokePat` (`Client.ts` around line 807, `adminCredentials.test.ts:66`'s `describe('adminRevokePat', ...)`
+at `src/__test__/api/adminCredentials.test.ts:66`). The manifest looks ahead of that
+commit — the TS SDK still needs a rename to `revokeUserPat` to match it and this file.
 """
 
 import pytest
@@ -26,7 +45,8 @@ def _client(stub_server) -> KonectyClient:
 
 
 @pytest.mark.asyncio
-async def test_admin_list_all_pats_returns_pats_and_legacy_tokens(stub_server) -> None:
+async def test_list_all_pats_returns_pats_and_legacy_tokens(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminCredentials.test.ts:12 (describe('listAllPats', ...))."""
     stub_server.route(
         "GET",
         "/api/admin/pats",
@@ -39,7 +59,7 @@ async def test_admin_list_all_pats_returns_pats_and_legacy_tokens(stub_server) -
         },
     )
 
-    result = await _client(stub_server).admin_list_all_pats()
+    result = await _client(stub_server).list_all_pats()
 
     assert result["data"]["pats"][0]["patId"] == "pat-1"
     assert result["data"]["legacyTokens"][0]["fingerprint"] == "abc123"
@@ -49,7 +69,8 @@ async def test_admin_list_all_pats_returns_pats_and_legacy_tokens(stub_server) -
 
 
 @pytest.mark.asyncio
-async def test_admin_list_all_pats_raises_forbidden_for_non_admin(stub_server) -> None:
+async def test_list_all_pats_raises_forbidden_for_non_admin(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminCredentials.test.ts:48 (403 'Admin access required')."""
     stub_server.route(
         "GET",
         "/api/admin/pats",
@@ -58,14 +79,19 @@ async def test_admin_list_all_pats_raises_forbidden_for_non_admin(stub_server) -
     )
 
     with pytest.raises(KonectyAPIError):
-        await _client(stub_server).admin_list_all_pats()
+        await _client(stub_server).list_all_pats()
 
 
 @pytest.mark.asyncio
-async def test_admin_revoke_pat_interpolates_user_and_pat_id(stub_server) -> None:
+async def test_revoke_user_pat_interpolates_user_and_pat_id(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/adminCredentials.test.ts:68 — TS method is
+    `adminRevokePat` as of commit b50e33a there (see module docstring's naming
+    discrepancy note); this SDK follows the manifest's `revoke_user_pat`.
+    """
     stub_server.route("DELETE", "/api/admin/pats/user-1/pat-1", {"success": True, "data": {"success": True}})
 
-    result = await _client(stub_server).admin_revoke_pat("user-1", "pat-1")
+    result = await _client(stub_server).revoke_user_pat("user-1", "pat-1")
 
     assert result["success"] is True
     request = stub_server.requests[0]
@@ -74,7 +100,8 @@ async def test_admin_revoke_pat_interpolates_user_and_pat_id(stub_server) -> Non
 
 
 @pytest.mark.asyncio
-async def test_admin_revoke_pat_raises_not_found(stub_server) -> None:
+async def test_revoke_user_pat_raises_not_found(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminCredentials.test.ts:91 (404 'PAT not found')."""
     stub_server.route(
         "DELETE",
         "/api/admin/pats/user-1/unknown",
@@ -83,18 +110,19 @@ async def test_admin_revoke_pat_raises_not_found(stub_server) -> None:
     )
 
     with pytest.raises(KonectyAPIError):
-        await _client(stub_server).admin_revoke_pat("user-1", "unknown")
+        await _client(stub_server).revoke_user_pat("user-1", "unknown")
 
 
 @pytest.mark.asyncio
-async def test_admin_revoke_legacy_token_interpolates_user_id_and_fingerprint(
+async def test_revoke_legacy_token_interpolates_user_id_and_fingerprint(
     stub_server,
 ) -> None:
+    """Equivalent TS test: src/__test__/api/adminCredentials.test.ts:109 (describe('revokeLegacyToken', ...))."""
     stub_server.route(
         "DELETE", "/api/admin/legacy-tokens/user-2/abc123", {"success": True, "data": {"success": True}}
     )
 
-    result = await _client(stub_server).admin_revoke_legacy_token("user-2", "abc123")
+    result = await _client(stub_server).revoke_legacy_token("user-2", "abc123")
 
     assert result["success"] is True
     request = stub_server.requests[0]
@@ -103,9 +131,10 @@ async def test_admin_revoke_legacy_token_interpolates_user_id_and_fingerprint(
 
 
 @pytest.mark.asyncio
-async def test_admin_create_service_account_sends_name_username_and_access_map(
+async def test_create_service_account_sends_name_username_and_access_map(
     stub_server,
 ) -> None:
+    """Equivalent TS test: src/__test__/api/adminServiceAccounts.test.ts:12 (describe('createServiceAccount', ...))."""
     stub_server.route(
         "POST",
         "/api/admin/service-accounts",
@@ -121,7 +150,7 @@ async def test_admin_create_service_account_sends_name_username_and_access_map(
         status=201,
     )
 
-    result = await _client(stub_server).admin_create_service_account(
+    result = await _client(stub_server).create_service_account(
         "Bot", "svc-bot", {"Contact": "read"}
     )
 
@@ -137,7 +166,7 @@ async def test_admin_create_service_account_sends_name_username_and_access_map(
 
 
 @pytest.mark.asyncio
-async def test_admin_create_service_account_defaults_access_map_to_empty_dict(
+async def test_create_service_account_defaults_access_map_to_empty_dict(
     stub_server,
 ) -> None:
     stub_server.route(
@@ -147,7 +176,7 @@ async def test_admin_create_service_account_defaults_access_map_to_empty_dict(
         status=201,
     )
 
-    await _client(stub_server).admin_create_service_account("Bot 2", "svc-bot-2")
+    await _client(stub_server).create_service_account("Bot 2", "svc-bot-2")
 
     assert stub_server.requests[0]["json"] == {
         "name": "Bot 2",
@@ -157,9 +186,10 @@ async def test_admin_create_service_account_defaults_access_map_to_empty_dict(
 
 
 @pytest.mark.asyncio
-async def test_admin_create_service_account_raises_conflict_on_duplicate_username(
+async def test_create_service_account_raises_conflict_on_duplicate_username(
     stub_server,
 ) -> None:
+    """Equivalent TS test: src/__test__/api/adminServiceAccounts.test.ts:51 (409 'Username already in use')."""
     stub_server.route(
         "POST",
         "/api/admin/service-accounts",
@@ -168,11 +198,12 @@ async def test_admin_create_service_account_raises_conflict_on_duplicate_usernam
     )
 
     with pytest.raises(KonectyAPIError):
-        await _client(stub_server).admin_create_service_account("Bot", "taken")
+        await _client(stub_server).create_service_account("Bot", "taken")
 
 
 @pytest.mark.asyncio
-async def test_admin_list_service_accounts_returns_accounts_with_pats(stub_server) -> None:
+async def test_list_service_accounts_returns_accounts_with_pats(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminServiceAccounts.test.ts:69 (describe('listServiceAccounts', ...))."""
     stub_server.route(
         "GET",
         "/api/admin/service-accounts",
@@ -191,7 +222,7 @@ async def test_admin_list_service_accounts_returns_accounts_with_pats(stub_serve
         },
     )
 
-    result = await _client(stub_server).admin_list_service_accounts()
+    result = await _client(stub_server).list_service_accounts()
 
     assert result["data"][0]["username"] == "svc-bot"
     request = stub_server.requests[0]
@@ -200,16 +231,17 @@ async def test_admin_list_service_accounts_returns_accounts_with_pats(stub_serve
 
 
 @pytest.mark.asyncio
-async def test_admin_update_service_account_access_interpolates_id_and_sends_access_map(
+async def test_update_service_account_access_interpolates_id_and_sends_access_map(
     stub_server,
 ) -> None:
+    """Equivalent TS test: src/__test__/api/adminServiceAccounts.test.ts:109 (describe('updateServiceAccountAccess', ...))."""
     stub_server.route(
         "PUT",
         "/api/admin/service-accounts/sa-1/access",
         {"success": True, "data": {"_id": "sa-1", "access": {"defaults": False, "Contact": "ServiceReadWrite"}}},
     )
 
-    result = await _client(stub_server).admin_update_service_account_access(
+    result = await _client(stub_server).update_service_account_access(
         "sa-1", {"Contact": "readWrite"}
     )
 
@@ -221,7 +253,8 @@ async def test_admin_update_service_account_access_interpolates_id_and_sends_acc
 
 
 @pytest.mark.asyncio
-async def test_admin_update_service_account_access_raises_not_found(stub_server) -> None:
+async def test_update_service_account_access_raises_not_found(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminServiceAccounts.test.ts:140 (404 'Service account not found')."""
     stub_server.route(
         "PUT",
         "/api/admin/service-accounts/unknown/access",
@@ -230,13 +263,14 @@ async def test_admin_update_service_account_access_raises_not_found(stub_server)
     )
 
     with pytest.raises(KonectyAPIError):
-        await _client(stub_server).admin_update_service_account_access("unknown", {})
+        await _client(stub_server).update_service_account_access("unknown", {})
 
 
 @pytest.mark.asyncio
-async def test_admin_create_service_account_pat_sends_name_only_when_no_expiry(
+async def test_create_service_account_pat_sends_name_only_when_no_expiry(
     stub_server,
 ) -> None:
+    """Equivalent TS test: src/__test__/api/adminServiceAccounts.test.ts:158 (describe('createServiceAccountPat', ...))."""
     stub_server.route(
         "POST",
         "/api/admin/service-accounts/sa-1/pats",
@@ -244,7 +278,7 @@ async def test_admin_create_service_account_pat_sends_name_only_when_no_expiry(
         status=201,
     )
 
-    result = await _client(stub_server).admin_create_service_account_pat("sa-1", "svc token")
+    result = await _client(stub_server).create_service_account_pat("sa-1", "svc token")
 
     assert result["data"]["token"] == "kpat_svc"
     request = stub_server.requests[0]
@@ -254,9 +288,10 @@ async def test_admin_create_service_account_pat_sends_name_only_when_no_expiry(
 
 
 @pytest.mark.asyncio
-async def test_admin_create_service_account_pat_sends_expires_at_when_given(
+async def test_create_service_account_pat_sends_expires_at_when_given(
     stub_server,
 ) -> None:
+    """Equivalent TS test: src/__test__/api/adminServiceAccounts.test.ts:160 (name + expiresAt, show-once token)."""
     stub_server.route(
         "POST",
         "/api/admin/service-accounts/sa-1/pats",
@@ -264,7 +299,7 @@ async def test_admin_create_service_account_pat_sends_expires_at_when_given(
         status=201,
     )
 
-    await _client(stub_server).admin_create_service_account_pat(
+    await _client(stub_server).create_service_account_pat(
         "sa-1", "svc token", expires_at="2027-06-01T00:00:00.000Z"
     )
 
@@ -275,9 +310,10 @@ async def test_admin_create_service_account_pat_sends_expires_at_when_given(
 
 
 @pytest.mark.asyncio
-async def test_admin_create_service_account_pat_raises_for_non_service_account_target(
+async def test_create_service_account_pat_raises_for_non_service_account_target(
     stub_server,
 ) -> None:
+    """Equivalent TS test: src/__test__/api/adminServiceAccounts.test.ts:186 (403 ADM-02)."""
     stub_server.route(
         "POST",
         "/api/admin/service-accounts/human-1/pats",
@@ -293,4 +329,4 @@ async def test_admin_create_service_account_pat_raises_for_non_service_account_t
     )
 
     with pytest.raises(KonectyAPIError):
-        await _client(stub_server).admin_create_service_account_pat("human-1", "nope")
+        await _client(stub_server).create_service_account_pat("human-1", "nope")

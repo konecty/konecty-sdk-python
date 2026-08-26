@@ -454,19 +454,26 @@ class KonectyClient:
             self._admin_service = AdminService(self)
         return self._admin_service
 
-    async def admin_list_all_pats(self) -> Dict[str, Any]:
+    async def list_all_pats(self) -> Dict[str, Any]:
         """Admin: list every PAT and legacy perpetual token in the namespace (GET /api/admin/pats)."""
         return await self._admin.list_all_pats()
 
-    async def admin_revoke_pat(self, user_id: str, pat_id: str) -> Dict[str, Any]:
-        """Admin: revoke a PAT belonging to any user (DELETE /api/admin/pats/{user_id}/{pat_id})."""
-        return await self._admin.revoke_pat(user_id, pat_id)
+    async def revoke_user_pat(self, user_id: str, pat_id: str) -> Dict[str, Any]:
+        """
+        Admin: revoke a PAT belonging to any user (DELETE /api/admin/pats/{user_id}/{pat_id}).
 
-    async def admin_revoke_legacy_token(self, user_id: str, fingerprint: str) -> Dict[str, Any]:
+        Named `revoke_user_pat` — not `revoke_pat` — because that flat name is already
+        taken by the self-service method above, and the two act on different resources
+        (`user_id` + `pat_id` here vs. a caller-scoped `pat_id`). Mirrors the TypeScript
+        SDK's equivalent method for the same reason.
+        """
+        return await self._admin.revoke_user_pat(user_id, pat_id)
+
+    async def revoke_legacy_token(self, user_id: str, fingerprint: str) -> Dict[str, Any]:
         """Admin: revoke a legacy perpetual token by fingerprint (DELETE /api/admin/legacy-tokens/{user_id}/{fingerprint})."""
         return await self._admin.revoke_legacy_token(user_id, fingerprint)
 
-    async def admin_create_service_account(
+    async def create_service_account(
         self,
         name: str,
         username: str,
@@ -479,11 +486,11 @@ class KonectyClient:
         """
         return await self._admin.create_service_account(name, username, access_map)
 
-    async def admin_list_service_accounts(self) -> Dict[str, Any]:
+    async def list_service_accounts(self) -> Dict[str, Any]:
         """Admin: list every Service Account and its PATs (GET /api/admin/service-accounts)."""
         return await self._admin.list_service_accounts()
 
-    async def admin_update_service_account_access(
+    async def update_service_account_access(
         self, service_account_id: str, access_map: Dict[str, str]
     ) -> Dict[str, Any]:
         """Admin: replace a Service Account's access map (PUT /api/admin/service-accounts/{id}/access)."""
@@ -491,7 +498,7 @@ class KonectyClient:
             service_account_id, access_map
         )
 
-    async def admin_create_service_account_pat(
+    async def create_service_account_pat(
         self,
         service_account_id: str,
         name: str,
