@@ -22,14 +22,12 @@ Parity with the TypeScript SDK (`konecty/konecty-sdk`, branch `feat/pat-service-
 - `src/__test__/api/adminServiceAccounts.test.ts` — `createServiceAccount`,
   `listServiceAccounts`, `updateServiceAccountAccess`, `createServiceAccountPat`.
 
-Naming discrepancy found while wiring this parity (flagging per AGENTS.md "verifique, não
-chute" rather than silently picking one): `docs/features.json` in the Konecty core repo
-maps `admin.pats.revoke` to `admin.revokeUserPat` / `admin.revoke_user_pat`, which is what
-this file follows for `revoke_user_pat`. But the TypeScript SDK code actually checked out
-locally (konecty-sdk, commit b50e33a on `feat/pat-service-accounts`) still names the method
-`adminRevokePat` (`Client.ts` around line 807, `adminCredentials.test.ts:66`'s `describe('adminRevokePat', ...)`
-at `src/__test__/api/adminCredentials.test.ts:66`). The manifest looks ahead of that
-commit — the TS SDK still needs a rename to `revokeUserPat` to match it and this file.
+Cross-SDK naming: `docs/features.json` maps `admin.pats.revoke` to
+`admin.revokeUserPat` / `admin.revoke_user_pat`, and both SDKs now implement it —
+this file's `revoke_user_pat` and the TS SDK's `revokeUserPat` (konecty-sdk branch
+feat/pat-service-accounts, `describe('revokeUserPat')` in
+`src/__test__/api/adminCredentials.test.ts`) — closing the divergence flagged
+during the parallel implementation.
 """
 
 import pytest
@@ -85,9 +83,8 @@ async def test_list_all_pats_raises_forbidden_for_non_admin(stub_server) -> None
 @pytest.mark.asyncio
 async def test_revoke_user_pat_interpolates_user_and_pat_id(stub_server) -> None:
     """
-    Equivalent TS test: src/__test__/api/adminCredentials.test.ts:68 — TS method is
-    `adminRevokePat` as of commit b50e33a there (see module docstring's naming
-    discrepancy note); this SDK follows the manifest's `revoke_user_pat`.
+    Equivalent TS test: src/__test__/api/adminCredentials.test.ts —
+    describe('revokeUserPat').
     """
     stub_server.route("DELETE", "/api/admin/pats/user-1/pat-1", {"success": True, "data": {"success": True}})
 
