@@ -382,3 +382,47 @@ async def test_create_service_account_pat_raises_for_non_service_account_target(
     request = stub_server.requests[0]
     assert request["method"] == "POST"
     assert request["path"] == "/api/admin/service-accounts/human-1/pats"
+
+
+@pytest.mark.asyncio
+async def test_revoke_legacy_token_raises_not_found(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/adminCredentials.test.ts —
+    describe('revokeLegacyToken') > it('Should return the 404 not-found error
+    verbatim when the fingerprint does not belong to the given userId').
+    """
+    stub_server.route(
+        "DELETE",
+        "/api/admin/legacy-tokens/user-2/unknown-fingerprint",
+        {"success": False, "errors": [{"message": "Legacy token not found"}]},
+        status=404,
+    )
+
+    with pytest.raises(KonectyAPIError, match="Legacy token not found"):
+        await _client(stub_server).revoke_legacy_token("user-2", "unknown-fingerprint")
+
+    request = stub_server.requests[0]
+    assert request["method"] == "DELETE"
+    assert request["path"] == "/api/admin/legacy-tokens/user-2/unknown-fingerprint"
+
+
+@pytest.mark.asyncio
+async def test_list_service_accounts_raises_forbidden_for_non_admin(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/adminServiceAccounts.test.ts —
+    describe('listServiceAccounts') > it('Should return the 403 error verbatim
+    when the caller is not an admin').
+    """
+    stub_server.route(
+        "GET",
+        "/api/admin/service-accounts",
+        {"success": False, "errors": [{"message": "Admin access required"}]},
+        status=403,
+    )
+
+    with pytest.raises(KonectyAPIError, match="Admin access required"):
+        await _client(stub_server).list_service_accounts()
+
+    request = stub_server.requests[0]
+    assert request["method"] == "GET"
+    assert request["path"] == "/api/admin/service-accounts"

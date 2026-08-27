@@ -127,7 +127,7 @@ async def test_list_pats_returns_data_without_hashed_token(stub_server) -> None:
 @pytest.mark.asyncio
 async def test_revoke_pat_builds_path_with_id(stub_server) -> None:
     """
-    Equivalent TS test: src/__test__/api/pat.test.ts:135 — describe('revokePat'),
+    Equivalent TS test: src/__test__/api/pat.test.ts — describe('revokePat'),
     it('Should DELETE /rest/auth/pat/:id').
     """
     stub_server.route("DELETE", "/rest/auth/pat/pat-1", {"success": True})
@@ -143,7 +143,7 @@ async def test_revoke_pat_builds_path_with_id(stub_server) -> None:
 @pytest.mark.asyncio
 async def test_revoke_pat_raises_not_found_for_unknown_id(stub_server) -> None:
     """
-    Equivalent TS test: src/__test__/api/pat.test.ts:159 — describe('revokePat'),
+    Equivalent TS test: src/__test__/api/pat.test.ts — describe('revokePat'),
     it('Should return the 404 not-found error verbatim when the PAT does not
     belong to the caller').
     """
@@ -160,3 +160,27 @@ async def test_revoke_pat_raises_not_found_for_unknown_id(stub_server) -> None:
     request = stub_server.requests[0]
     assert request["method"] == "DELETE"
     assert request["path"] == "/rest/auth/pat/unknown"
+
+
+@pytest.mark.asyncio
+async def test_list_pats_raises_on_unauthorized(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/pat.test.ts —
+    describe('listPats') > it('Should return the 401 error verbatim when the
+    caller is not authenticated'). The TS SDK returns the error envelope;
+    this SDK's convention is raising KonectyAPIError — same wire, per-repo
+    error surface.
+    """
+    stub_server.route(
+        "GET",
+        "/rest/auth/pat",
+        {"success": False, "errors": [{"message": "Unauthorized"}]},
+        status=401,
+    )
+
+    with pytest.raises(KonectyAPIError, match="Unauthorized"):
+        await _client(stub_server).list_pats()
+
+    request = stub_server.requests[0]
+    assert request["method"] == "GET"
+    assert request["path"] == "/rest/auth/pat"
