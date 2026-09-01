@@ -5,13 +5,14 @@ Mirrors the backend's `src/server/routes/api/admin/credentials.ts` and
 requires an admin session — a regular user gets 403.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from .base import BaseService
 
 ADMIN_PATS_PATH = "/api/admin/pats"
 ADMIN_LEGACY_TOKENS_PATH = "/api/admin/legacy-tokens"
 ADMIN_SERVICE_ACCOUNTS_PATH = "/api/admin/service-accounts"
+ADMIN_MCP_ACCESS_PATH = "/api/admin/mcp-access"
 
 
 class AdminService(BaseService):
@@ -93,3 +94,30 @@ class AdminService(BaseService):
             payload["expiresAt"] = expires_at
         path = f"{ADMIN_SERVICE_ACCOUNTS_PATH}/{service_account_id}/pats"
         return await self._post(path, json=payload)
+
+    async def get_mcp_access(self) -> Dict[str, Any]:
+        """
+        GET /api/admin/mcp-access. Returns `data`: {roles, readRoleIds, writeRoleIds, readOnlyConfig}.
+
+        `readRoleIds` are the roles allowed to reach the MCP; `writeRoleIds` the subset
+        also allowed to use write/destructive tools (a role listed there reads too, whether
+        or not it also appears in `readRoleIds`). `readOnlyConfig` is true when the
+        deployment loads its namespace config from a metadata directory — `update_mcp_access`
+        then refuses with 409.
+        """
+        return await self._get(ADMIN_MCP_ACCESS_PATH)
+
+    async def update_mcp_access(
+        self, read_role_ids: List[str], write_role_ids: List[str]
+    ) -> Dict[str, Any]:
+        """
+        PUT /api/admin/mcp-access. Wire body: {readRoleIds, writeRoleIds}.
+
+        Replaces both lists wholesale (a role omitted loses access). An unknown role id
+        is rejected with 400 and nothing is written; a deployment configured by a metadata
+        directory answers 409 with code `mcp-access-config-read-only`.
+        """
+        return await self._put(
+            ADMIN_MCP_ACCESS_PATH,
+            json={"readRoleIds": read_role_ids, "writeRoleIds": write_role_ids},
+        )
