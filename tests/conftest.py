@@ -28,6 +28,11 @@ class StubServer:
             {
                 "method": request.method,
                 "path": request.path,
+                # `path` vem DECODIFICADO pelo aiohttp; `raw_path` é o que foi para a rede.
+                # Sem ele a codificação de segmento não é asseverável, e é exatamente onde a
+                # divergência entre os dois SDKs já aconteceu (`+` do quote_plus contra `%20` do
+                # encodeURIComponent).
+                "raw_path": request.raw_path,
                 "query": dict(request.query),
                 "json": payload,
                 "authorization": request.headers.get("Authorization"),
