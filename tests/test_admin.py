@@ -526,3 +526,234 @@ async def test_update_mcp_access_returns_read_only_config_error(stub_server) -> 
 
     with pytest.raises(KonectyAPIError, match="METADATA_DIR"):
         await _client(stub_server).update_mcp_access(["role-r"], [])
+
+# --- Meta Admin API (fatia mínima) --------------------------------------------------------------
+#
+# Paridade com `src/__test__/api/adminMeta.test.ts` do `konecty-sdk`: cada teste abaixo cita o
+# equivalente de lá e usa **a mesma entrada e a mesma saída esperada**.
+#
+# Diferença de contrato que é da casa, não desta fatia: aqui um não-2xx levanta `KonectyAPIError`,
+# enquanto o TS devolve o envelope `{success: False, errors}`. O código estável continua alcançável
+# — `KonectyAPIError` recebe a lista de `errors` inteira, então `exc.value.args[0][0]["code"]` dá o
+# mesmo valor que o TS expõe em `result.errors[0].code`.
+
+
+@pytest.mark.asyncio
+async def test_list_meta_documents_gets_the_meta_collection(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts (describe('listMetaDocuments'))."""
+    stub_server.route(
+        "GET",
+        "/api/admin/meta",
+        {"success": True, "data": [{"_id": "Contact", "name": "Contact", "type": "document"}]},
+    )
+
+    result = await _client(stub_server).list_meta_documents()
+
+    assert result["data"][0]["_id"] == "Contact"
+    request = stub_server.requests[0]
+    assert request["method"] == "GET"
+    assert request["path"] == "/api/admin/meta"
+
+
+@pytest.mark.asyncio
+async def test_read_meta_encodes_the_document_segment(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/adminMeta.test.ts —
+    'Should GET /api/admin/meta/:document with the segment percent-encoded'.
+
+    `%20`, nunca `+`: `quote(safe="")` casa com o `encodeURIComponent` do TS. Com `quote_plus` as
+    duas URLs deixariam de bater byte a byte — a divergência que já mordeu este time.
+    """
+    stub_server.route("GET", "/api/admin/meta/My Doc", {"success": True, "data": {"_id": "My Doc", "type": "document"}})
+
+    await _client(stub_server).read_meta("My Doc")
+
+    # `raw_path`, não `path`: o aiohttp decodifica `path`, e o que importa aqui é o que foi para a
+    # rede — a mesma URL que o TS produz.
+    assert stub_server.requests[0]["raw_path"] == "/api/admin/meta/My%20Doc"
+
+
+@pytest.mark.asyncio
+async def test_read_meta_returns_not_found_envelope(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts — 'Should surface the 404 envelope'."""
+    stub_server.route(
+        "GET",
+        "/api/admin/meta/Ghost",
+        {"success": False, "errors": [{"message": "Meta not found"}]},
+        status=404,
+    )
+
+    with pytest.raises(KonectyAPIError, match="Meta not found"):
+        await _client(stub_server).read_meta("Ghost")
+
+
+@pytest.mark.asyncio
+async def test_upsert_meta_puts_the_body_and_reports_the_version(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts — 'Should PUT ... and report the version'."""
+    stub_server.route(
+        "PUT",
+        "/api/admin/meta/Contact/document",
+        {"success": True, "data": {"matchedCount": 1, "modifiedCount": 1, "upsertedCount": 0, "versioned": True, "version": 3}},
+    )
+
+    result = await _client(stub_server).upsert_meta("Contact", "document", {"icon": "random", "menuSorter": 1})
+
+    assert result["data"]["version"] == 3
+    assert result["data"]["versioned"] is True
+    request = stub_server.requests[0]
+    assert request["method"] == "PUT"
+    assert request["path"] == "/api/admin/meta/Contact/document"
+    # Corpo byte a byte igual ao do TS.
+    assert request["json"] == {"icon": "random", "menuSorter": 1}
+
+
+@pytest.mark.asyncio
+async def test_upsert_meta_reports_no_version_when_content_is_identical(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts — 'Should report versioned=false ...'."""
+    stub_server.route(
+        "PUT",
+        "/api/admin/meta/Contact/document",
+        {"success": True, "data": {"matchedCount": 1, "modifiedCount": 0, "upsertedCount": 0, "versioned": False, "version": 3}},
+    )
+
+    result = await _client(stub_server).upsert_meta("Contact", "document", {"icon": "random"})
+
+    assert result["data"]["versioned"] is False
+
+
+@pytest.mark.asyncio
+async def test_upsert_meta_surfaces_the_read_only_config_code(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts — 'Should surface the 409 read-only-config code'."""
+    stub_server.route(
+        "PUT",
+        "/api/admin/meta/Contact/document",
+        {"success": False, "errors": [{"message": "Metadata is owned by the metadata directory", "code": "meta-admin-config-read-only"}]},
+        status=409,
+    )
+
+    with pytest.raises(KonectyAPIError) as exc:
+        await _client(stub_server).upsert_meta("Contact", "document", {})
+
+    # Mesmo valor que o TS expõe em `result.errors[0].code`.
+    assert exc.value.args[0][0]["code"] == "meta-admin-config-read-only"
+
+
+@pytest.mark.asyncio
+async def test_upsert_meta_surfaces_the_requires_session_code(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts — 'Should surface the 403 requires-session code'."""
+    stub_server.route(
+        "PUT",
+        "/api/admin/meta/Contact/document",
+        {"success": False, "errors": [{"message": "requires a first-party session", "code": "admin-credential-routes-require-session"}]},
+        status=403,
+    )
+
+    with pytest.raises(KonectyAPIError) as exc:
+        await _client(stub_server).upsert_meta("Contact", "document", {})
+
+    assert exc.value.args[0][0]["code"] == "admin-credential-routes-require-session"
+
+
+@pytest.mark.asyncio
+async def test_delete_meta_deletes_and_reports_the_version(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts (describe('deleteMeta'))."""
+    stub_server.route("DELETE", "/api/admin/meta/Contact/document", {"success": True, "data": {"deletedCount": 1, "version": 4}})
+
+    result = await _client(stub_server).delete_meta("Contact", "document")
+
+    assert result["data"]["deletedCount"] == 1
+    assert result["data"]["version"] == 4
+    assert stub_server.requests[0]["method"] == "DELETE"
+
+
+@pytest.mark.asyncio
+async def test_list_meta_history_sends_limit_and_offset(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/adminMeta.test.ts —
+    'Should GET /api/admin/meta/:metaId/history with limit and offset in the query string'.
+    """
+    stub_server.route("GET", "/api/admin/meta/Contact:list:Default/history", {"success": True, "data": []})
+
+    await _client(stub_server).list_meta_history("Contact:list:Default", limit=10, offset=20)
+
+    request = stub_server.requests[0]
+    # `_id` de meta carrega `:`, codificado no segmento; a query fica fora dele.
+    # `:` fica cru: o `yarl` do aiohttp normaliza `%3A` de volta para `:` ao montar a requisição,
+    # porque `:` é `pchar` legal (RFC 3986). O TS foi alinhado a isto — ver o `segment()` de
+    # src/sdk/domains/adminMeta.ts — para que os dois SDKs coloquem os MESMOS bytes na rede.
+    assert request["raw_path"] == "/api/admin/meta/Contact:list:Default/history?limit=10&offset=20"
+    assert request["query"] == {"limit": "10", "offset": "20"}
+
+
+@pytest.mark.asyncio
+async def test_list_meta_history_omits_the_query_when_no_options(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts — 'Should omit the query string entirely'."""
+    stub_server.route("GET", "/api/admin/meta/Contact/history", {"success": True, "data": []})
+
+    await _client(stub_server).list_meta_history("Contact")
+
+    assert stub_server.requests[0]["query"] == {}
+
+
+@pytest.mark.asyncio
+async def test_list_meta_history_returns_empty_for_a_meta_never_written(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts — 'Should return an empty list ... not an error'."""
+    stub_server.route("GET", "/api/admin/meta/Contact/history", {"success": True, "data": []})
+
+    result = await _client(stub_server).list_meta_history("Contact")
+
+    # Ausência de histórico não é ausência de metadado — o consumidor precisa distinguir.
+    assert result["data"] == []
+
+
+@pytest.mark.asyncio
+async def test_rollback_meta_posts_the_version_and_reports_the_new_one(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts (describe('rollbackMeta'))."""
+    stub_server.route("POST", "/api/admin/meta/Contact/rollback", {"success": True, "data": {"version": 5, "restoredFrom": 2}})
+
+    result = await _client(stub_server).rollback_meta("Contact", 2)
+
+    request = stub_server.requests[0]
+    assert request["method"] == "POST"
+    assert request["path"] == "/api/admin/meta/Contact/rollback"
+    assert request["json"] == {"version": 2}
+    # Forward-only: restaurar a v2 cria a v5 — não apaga a v3 nem a v4.
+    assert result["data"]["version"] == 5
+    assert result["data"]["restoredFrom"] == 2
+
+
+#: Vetor de codificação compartilhado com o SDK TypeScript. As mesmas 8 entradas estão em
+#: `src/__test__/api/adminMeta.test.ts` (`SEGMENT_ENCODING_CASES`), com as mesmas saídas — é o que
+#: trava a paridade byte a byte da URL, onde a divergência entre os dois SDKs já aconteceu.
+SEGMENT_ENCODING_CASES = [
+    ("Contact:list:Default", "Contact:list:Default"),
+    ("My Doc", "My%20Doc"),
+    # `/` SEMPRE codificado: cru, quebraria o path em dois segmentos.
+    ("a/b", "a%2Fb"),
+    # `+` SEMPRE codificado: cru num path, servidor leniente pode lê-lo como espaço.
+    ("a+b", "a%2Bb"),
+    ('{"$ne":null}', "%7B%22$ne%22:null%7D"),
+    ("a&b", "a&b"),
+    ("a@b", "a@b"),
+    ("ç", "%C3%A7"),
+]
+
+
+@pytest.mark.asyncio
+async def test_path_segment_encoding_matches_the_typescript_sdk(stub_server) -> None:
+    """
+    Equivalent TS test: src/__test__/api/adminMeta.test.ts —
+    describe('path segment encoding') > 'Should produce the same bytes the Python SDK puts on the wire'.
+
+    Assevera o `raw_path`, não o `path`: o aiohttp decodifica `path`, e o que precisa bater entre os
+    dois SDKs é o que vai para a rede.
+    """
+    client = _client(stub_server)
+
+    for raw, _encoded in SEGMENT_ENCODING_CASES:
+        stub_server.route("GET", f"/api/admin/meta/{raw}", {"success": True, "data": {}})
+        await client.read_meta(raw)
+
+    seen = [req["raw_path"].replace("/api/admin/meta/", "") for req in stub_server.requests]
+
+    assert seen == [encoded for _raw, encoded in SEGMENT_ENCODING_CASES]

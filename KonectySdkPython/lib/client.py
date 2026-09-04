@@ -486,6 +486,37 @@ class KonectyClient:
         """
         return await self._admin.create_service_account(name, username, access_map)
 
+    async def list_meta_documents(self) -> Dict[str, Any]:
+        """Admin: os documentos de metadado do namespace (GET /api/admin/meta)."""
+        return await self._admin.list_meta_documents()
+
+    async def read_meta(self, document: str) -> Dict[str, Any]:
+        """Admin: o metadado de um documento (GET /api/admin/meta/{document})."""
+        return await self._admin.read_meta(document)
+
+    async def upsert_meta(
+        self, document: str, type: str, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Admin: grava o metadado singleton de um tipo (PUT /api/admin/meta/{document}/{type})."""
+        return await self._admin.upsert_meta(document, type, body)
+
+    async def delete_meta(self, document: str, type: str) -> Dict[str, Any]:
+        """Admin: remove e versiona a remoção (DELETE /api/admin/meta/{document}/{type})."""
+        return await self._admin.delete_meta(document, type)
+
+    async def list_meta_history(
+        self,
+        meta_id: str,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Admin: versões de um metadado, mais recentes primeiro (GET /api/admin/meta/{metaId}/history)."""
+        return await self._admin.list_meta_history(meta_id, limit, offset)
+
+    async def rollback_meta(self, meta_id: str, version: int) -> Dict[str, Any]:
+        """Admin: restaura o conteúdo de uma versão anterior (POST /api/admin/meta/{metaId}/rollback)."""
+        return await self._admin.rollback_meta(meta_id, version)
+
     async def list_service_accounts(self) -> Dict[str, Any]:
         """Admin: list every Service Account and its PATs (GET /api/admin/service-accounts)."""
         return await self._admin.list_service_accounts()
