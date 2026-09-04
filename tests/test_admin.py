@@ -427,6 +427,105 @@ async def test_list_service_accounts_raises_forbidden_for_non_admin(stub_server)
     assert request["method"] == "GET"
     assert request["path"] == "/api/admin/service-accounts"
 
+@pytest.mark.asyncio
+async def test_get_mcp_access_returns_roles_and_lists(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMcpAccess.test.ts — describe('getMcpAccess') happy path."""
+    stub_server.route(
+        "GET",
+        "/api/admin/mcp-access",
+        {
+            "success": True,
+            "data": {
+                "roles": [
+                    {"_id": "role-r", "name": "Comercial"},
+                    {"_id": "role-w", "name": "Integração"},
+                ],
+                "readRoleIds": ["role-r", "role-w"],
+                "writeRoleIds": ["role-w"],
+                "readOnlyConfig": False,
+            },
+        },
+    )
+
+    result = await _client(stub_server).get_mcp_access()
+
+    assert result["data"]["readRoleIds"] == ["role-r", "role-w"]
+    assert result["data"]["writeRoleIds"] == ["role-w"]
+    assert result["data"]["readOnlyConfig"] is False
+    request = stub_server.requests[0]
+    assert request["method"] == "GET"
+    assert request["path"] == "/api/admin/mcp-access"
+
+
+@pytest.mark.asyncio
+async def test_get_mcp_access_returns_forbidden_for_non_admin(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMcpAccess.test.ts — 403 'Admin access required'."""
+    stub_server.route(
+        "GET",
+        "/api/admin/mcp-access",
+        {"success": False, "errors": [{"message": "Admin access required"}]},
+        status=403,
+    )
+
+    with pytest.raises(KonectyAPIError, match="Admin access required"):
+        await _client(stub_server).get_mcp_access()
+
+
+@pytest.mark.asyncio
+async def test_update_mcp_access_sends_both_lists(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMcpAccess.test.ts — describe('updateMcpAccess') happy path.
+
+    Same input and same expected wire body as the TS test: {readRoleIds, writeRoleIds}.
+    """
+    stub_server.route(
+        "PUT",
+        "/api/admin/mcp-access",
+        {"success": True, "data": {"readRoleIds": ["role-r", "role-w"], "writeRoleIds": ["role-w"]}},
+    )
+
+    result = await _client(stub_server).update_mcp_access(["role-r", "role-w"], ["role-w"])
+
+    assert result["data"]["writeRoleIds"] == ["role-w"]
+    request = stub_server.requests[0]
+    assert request["method"] == "PUT"
+    assert request["path"] == "/api/admin/mcp-access"
+    assert request["json"] == {"readRoleIds": ["role-r", "role-w"], "writeRoleIds": ["role-w"]}
+
+
+@pytest.mark.asyncio
+async def test_update_mcp_access_returns_unknown_role_error(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMcpAccess.test.ts — 400 'Unknown role: role-x'."""
+    stub_server.route(
+        "PUT",
+        "/api/admin/mcp-access",
+        {"success": False, "errors": [{"message": "Unknown role: role-x"}]},
+        status=400,
+    )
+
+    with pytest.raises(KonectyAPIError, match="Unknown role: role-x"):
+        await _client(stub_server).update_mcp_access(["role-x"], [])
+
+
+@pytest.mark.asyncio
+async def test_update_mcp_access_returns_read_only_config_error(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMcpAccess.test.ts — 409 mcp-access-config-read-only."""
+    stub_server.route(
+        "PUT",
+        "/api/admin/mcp-access",
+        {
+            "success": False,
+            "errors": [
+                {
+                    "message": "MCP access is configured by the metadata directory in this deployment (METADATA_DIR) — edit Namespace.json there instead.",
+                    "code": "mcp-access-config-read-only",
+                }
+            ],
+        },
+        status=409,
+    )
+
+    with pytest.raises(KonectyAPIError, match="METADATA_DIR"):
+        await _client(stub_server).update_mcp_access(["role-r"], [])
 
 # --- Meta Admin API (fatia mínima) --------------------------------------------------------------
 #
