@@ -510,6 +510,21 @@ class KonectyClient:
             service_account_id, name, expires_at=expires_at
         )
 
+    async def get_mcp_access(self) -> Dict[str, Any]:
+        """Admin: read the roles allowed to reach the MCP, split into read and write (GET /api/admin/mcp-access)."""
+        return await self._admin.get_mcp_access()
+
+    async def update_mcp_access(
+        self, read_role_ids: List[str], write_role_ids: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Admin: replace both MCP role lists (PUT /api/admin/mcp-access).
+
+        A role in `write_role_ids` also gets read access. Mirrors the TypeScript SDK's
+        `updateMcpAccess`.
+        """
+        return await self._admin.update_mcp_access(read_role_ids, write_role_ids)
+
     @property
     def _query(self) -> QueryService:
         if not hasattr(self, "_query_service"):
