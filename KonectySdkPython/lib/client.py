@@ -497,7 +497,12 @@ class KonectyClient:
     async def upsert_meta(
         self, document: str, type: str, body: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Admin: grava o metadado singleton de um tipo (PUT /api/admin/meta/{document}/{type})."""
+        """
+        Admin: grava o metadado singleton de um tipo (PUT /api/admin/meta/{document}/{type}).
+
+        Campo de hook que o `body` omite é preservado do metadado já gravado e volta nomeado em
+        `data["preservedHooks"]`; para remover um hook, envie `None` naquele campo.
+        """
         return await self._admin.upsert_meta(document, type, body)
 
     async def delete_meta(self, document: str, type: str) -> Dict[str, Any]:
