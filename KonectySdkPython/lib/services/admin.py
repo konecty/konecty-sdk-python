@@ -166,9 +166,18 @@ class AdminService(BaseService):
         PUT /api/admin/meta/:document/:type — grava o metadado singleton de um tipo
         (`document`, `composite`, `namespace`).
 
-        Returns `data`: {matchedCount, modifiedCount, upsertedCount, versioned, version}.
-        Escrita idêntica ao estado atual não cria versão (`versioned: False`). Num deployment com
-        `METADATA_DIR` responde `409` com `META_ADMIN_CONFIG_READ_ONLY_CODE`.
+        Returns `data`: {matchedCount, modifiedCount, upsertedCount, versioned, version,
+        preservedHooks}. Escrita idêntica ao estado atual não cria versão (`versioned: False`).
+        Num deployment com `METADATA_DIR` responde `409` com `META_ADMIN_CONFIG_READ_ONLY_CODE`.
+
+        `preservedHooks` lista os campos de hook (`scriptBeforeValidation`, `validationScript`,
+        `scriptAfterSave`, `validationData`) que o `body` **omitiu** e vieram do metadado já
+        gravado. Hook é campo do metadado, mas nos repositórios de metadados ele vive em
+        `MetaObjects/<Doc>/hook/<nome>.js|json` e nunca aparece no `document.json`; por isso o core
+        preserva o hook cuja chave o payload não menciona, em vez de apagá-lo. Para remover um
+        hook, envie `None` explícito naquele campo. A chave está **ausente** quando o deployment é
+        anterior ao contrato — ausente significa "este servidor não informa", não "nada foi
+        preservado".
         """
         return await self._put(f"{ADMIN_META_PATH}/{_segment(document)}/{_segment(type)}", json=body)
 

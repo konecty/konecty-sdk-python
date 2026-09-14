@@ -622,6 +622,50 @@ async def test_upsert_meta_reports_no_version_when_content_is_identical(stub_ser
 
 
 @pytest.mark.asyncio
+async def test_upsert_meta_reports_the_preserved_hooks(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts — 'Should report the hook fields the core preserved'."""
+    stub_server.route(
+        "PUT",
+        "/api/admin/meta/Contact/document",
+        {
+            "success": True,
+            "data": {
+                "matchedCount": 1,
+                "modifiedCount": 1,
+                "upsertedCount": 0,
+                "versioned": True,
+                "version": 4,
+                "preservedHooks": ["scriptBeforeValidation", "validationData"],
+            },
+        },
+    )
+
+    # O corpo é a forma literal de um `document.json` de repositório de metadados: nenhuma chave
+    # de hook, porque lá elas vivem em `hook/*.js|json`.
+    result = await _client(stub_server).upsert_meta("Contact", "document", {"icon": "random", "menuSorter": 1})
+
+    assert result["data"]["preservedHooks"] == ["scriptBeforeValidation", "validationData"]
+    # Corpo byte a byte igual ao do TS.
+    assert stub_server.requests[0]["json"] == {"icon": "random", "menuSorter": 1}
+
+
+@pytest.mark.asyncio
+async def test_upsert_meta_omits_preserved_hooks_on_an_older_deployment(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMeta.test.ts — 'Should leave preservedHooks undefined ...'."""
+    stub_server.route(
+        "PUT",
+        "/api/admin/meta/Contact/document",
+        {"success": True, "data": {"matchedCount": 1, "modifiedCount": 1, "upsertedCount": 0, "versioned": True, "version": 4}},
+    )
+
+    result = await _client(stub_server).upsert_meta("Contact", "document", {"icon": "random"})
+
+    # Ausente significa "este servidor não informa", não "nada foi preservado" — mesmo contrato
+    # que o `undefined` do TS.
+    assert "preservedHooks" not in result["data"]
+
+
+@pytest.mark.asyncio
 async def test_upsert_meta_surfaces_the_read_only_config_code(stub_server) -> None:
     """Equivalent TS test: src/__test__/api/adminMeta.test.ts — 'Should surface the 409 read-only-config code'."""
     stub_server.route(
