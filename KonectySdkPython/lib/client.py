@@ -7,7 +7,12 @@ from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Union, ca
 
 import aiohttp
 
-from .exceptions import KonectyAPIError, KonectyError, KonectyValidationError
+from .exceptions import (
+    KonectyAPIError,
+    KonectyError,
+    KonectyValidationError,
+    raise_for_konecty_errors,
+)
 from .feature_types.kpi import KpiConfig
 from .file_manager import FileManager
 from .filters import KonectyFilter, KonectyFindParams
@@ -55,6 +60,18 @@ def get_first_dict(items: List[Any]) -> Optional[KonectyDict]:
     if isinstance(first, dict):
         return cast(KonectyDict, first)
     return None
+
+
+async def _read_json_body(response: "aiohttp.ClientResponse") -> Optional[Dict[str, Any]]:
+    """
+    Lê o corpo como JSON sem explodir quando não é JSON (proxy, gateway, HTML).
+
+    Devolve ``None`` nesse caso, e o chamador cai no tratamento por status.
+    """
+    try:
+        return cast(Dict[str, Any], await response.json(content_type=None))
+    except Exception:  # noqa: BLE001 - corpo não-JSON é caso esperado aqui
+        return None
 
 
 class KonectyClient:
@@ -655,12 +672,18 @@ class KonectyClient:
                 headers={"Authorization": self.headers["Authorization"]},
             ) as response,
         ):
-            response.raise_for_status()
-            result = await response.json()
+            # O corpo é lido ANTES do raise_for_status: a recusa de sort acima do
+            # teto chega como HTTP 400 com `errors[0].code`, e levantar pelo status
+            # primeiro descartava mensagem e código, deixando só "400 Bad Request".
+            result = await _read_json_body(response)
+            if result is None:
+                response.raise_for_status()
+                raise KonectyAPIError(f"{response.status} {response.reason}")
             if not result.get("success", False):
                 errors = result.get("errors", [])
                 logger.error(errors)
-                raise KonectyAPIError(errors)
+                raise_for_konecty_errors(errors)
+            response.raise_for_status()
             data = result.get("data", [])
             return cast(List[KonectyDict], data)
     
@@ -710,12 +733,19 @@ class KonectyClient:
             params=params,
             headers={"Authorization": self.headers["Authorization"]},
         )
-        response.raise_for_status()
-        result = response.json()
+        # Mesma ordem do `find` assíncrono: corpo primeiro, status depois.
+        try:
+            result = response.json()
+        except ValueError:
+            result = None
+        if result is None:
+            response.raise_for_status()
+            raise KonectyAPIError(f"{response.status_code} {response.reason}")
         if not result.get("success", False):
             errors = result.get("errors", [])
             logger.error(errors)
-            raise KonectyAPIError(errors)
+            raise_for_konecty_errors(errors)
+        response.raise_for_status()
         data = result.get("data", [])
         return cast(List[KonectyDict], data)
 

@@ -37,6 +37,33 @@ O parâmetro `module` (ou `document`) identifica o tipo de documento no Konecty 
 
 `GET /api/auth/google/callback` é chamado pelo Google, nunca pelo SDK: ele redireciona para o `redirect_uri` do app com `code` + `state` (ou `error` + `state`, com códigos `access_denied`, `provider_error`, `email_not_verified`, `user_not_found`, `user_inactive`, `ambiguous_user`). O `authId` nunca transita em URL — existe apenas no corpo da resposta de `POST /api/auth/google/session`.
 
+## Ordenação acima de 1000 registros
+
+O Konecty recusa ordenação arbitrária quando `limit` passa de 1000 — e também no
+caso sem limite (`limit=-1`). A resposta é HTTP 400 com o código
+`SORT_ABOVE_MAX_PAGE_SIZE`. Antes de 2026-09 a API trocava o `sort` pedido por
+`{_id: 1}` em silêncio e devolvia 200 com os dados fora de ordem.
+
+O SDK levanta `KonectySortLimitError` (subclasse de `KonectyAPIError`, com
+`.code`), preservando a mensagem do servidor — que diz como corrigir a chamada:
+
+```python
+from KonectySdkPython.lib.exceptions import KonectySortLimitError
+
+try:
+    await client.find("Product", KonectyFindParams(filter=f, sort=[...], limit=5000))
+except KonectySortLimitError as error:
+    # ordene por _id (asc ou desc) e pagine por faixa de _id,
+    # ou peça no máximo 1000 registros
+    print(error.code)  # SORT_ABOVE_MAX_PAGE_SIZE
+```
+
+Ordenar por `_id` — ascendente **ou** descendente — é sempre aceito, em qualquer
+volume, e é o caminho recomendado para leitura em volume. `sort` vazio significa
+"sem ordenação" e não é recusado.
+
+Equivalente TypeScript: `KonectySortLimitError` exportado de `@konecty/sdk/Client`.
+
 ## Parâmetros do find (GET /rest/data/{module}/find)
 
 Os parâmetros são enviados como query string. O SDK monta esses parâmetros a partir de `KonectyFindParams` e `KonectyFilter` (módulo filters).
