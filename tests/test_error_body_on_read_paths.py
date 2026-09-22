@@ -102,11 +102,15 @@ async def test_count_documents_surfaces_sort_rejection_with_code(stub_server) ->
 
 
 @pytest.mark.asyncio
-async def test_non_json_body_still_raises_by_status(stub_server) -> None:
+async def test_non_object_body_raises_by_status_not_attribute_error(stub_server) -> None:
     """
-    Regressão: corpo não-JSON (proxy, gateway, HTML de erro) não pode virar
-    `AttributeError` na tentativa de ler `.get`. Cai no tratamento por status,
-    como o `find` já faz.
+    Corpo que é JSON válido mas NÃO é objeto — uma string ou lista, o que alguns
+    proxies devolvem — não pode virar `AttributeError` em `result.get(...)`.
+
+    `_read_json_body` anotava `Optional[Dict]` e usava `cast`, que não verifica
+    nada em runtime: o corpo `"<html>502</html>"` chegava como `str` e estourava
+    `AttributeError` no lugar do erro de API. Vale para `find` e `find_sync`
+    também — este caso cobre o helper, não só os três métodos acima.
     """
     stub_server.route("GET", "/rest/data/Product/abc123", "<html>502</html>", status=502)
     client = KonectyClient(base_url=stub_server.base_url, token="fake-token")

@@ -67,11 +67,20 @@ async def _read_json_body(response: "aiohttp.ClientResponse") -> Optional[Dict[s
     Lê o corpo como JSON sem explodir quando não é JSON (proxy, gateway, HTML).
 
     Devolve ``None`` nesse caso, e o chamador cai no tratamento por status.
+
+    Também devolve ``None`` quando o corpo é JSON válido mas **não é objeto** —
+    uma string ou lista, que é o que alguns proxies devolvem. O ``cast`` não
+    verifica nada em runtime, então sem esta checagem o chamador fazia
+    ``result.get(...)`` num ``str`` e recebia ``AttributeError`` no lugar do erro
+    de API.
     """
     try:
-        return cast(Dict[str, Any], await response.json(content_type=None))
+        body = await response.json(content_type=None)
     except Exception:  # noqa: BLE001 - corpo não-JSON é caso esperado aqui
         return None
+    if not isinstance(body, dict):
+        return None
+    return cast(Dict[str, Any], body)
 
 
 class KonectyClient:
@@ -698,7 +707,6 @@ class KonectyClient:
         if search:
             params["search"] = search
 
-        print(f"params: {params}")
         async with (
             aiohttp.ClientSession() as session,
             session.get(
@@ -707,12 +715,16 @@ class KonectyClient:
                 headers={"Authorization": self.headers["Authorization"]},
             ) as response,
         ):
-            response.raise_for_status()
-            result = await response.json()
+            # Mesma ordem do `find`: corpo primeiro, status depois. Ver `find`.
+            result = await _read_json_body(response)
+            if result is None:
+                response.raise_for_status()
+                raise KonectyAPIError(f"{response.status} {response.reason}")
             if not result.get("success", False):
                 errors = result.get("errors", [])
                 logger.error(errors)
-                raise KonectyAPIError(errors)
+                raise_for_konecty_errors(errors)
+            response.raise_for_status()
             data = result.get("data", [])
             return cast(List[KonectyDict], data)
 
@@ -767,12 +779,16 @@ class KonectyClient:
                 headers={"Authorization": self.headers["Authorization"]},
             ) as response,
         ):
-            response.raise_for_status()
-            result = await response.json()
+            # Mesma ordem do `find`: corpo primeiro, status depois. Ver `find`.
+            result = await _read_json_body(response)
+            if result is None:
+                response.raise_for_status()
+                raise KonectyAPIError(f"{response.status} {response.reason}")
             if not result.get("success", False):
                 errors = result.get("errors", [])
                 logger.error(errors)
-                raise KonectyAPIError(errors)
+                raise_for_konecty_errors(errors)
+            response.raise_for_status()
             data = result.get("data", [None])
             return get_first_dict(data)
 
@@ -1005,12 +1021,16 @@ class KonectyClient:
                 headers={"Authorization": self.headers["Authorization"]},
             ) as response,
         ):
-            response.raise_for_status()
-            result = await response.json()
+            # Mesma ordem do `find`: corpo primeiro, status depois. Ver `find`.
+            result = await _read_json_body(response)
+            if result is None:
+                response.raise_for_status()
+                raise KonectyAPIError(f"{response.status} {response.reason}")
             if not result.get("success", False):
                 errors = result.get("errors", [])
                 logger.error(errors)
-                raise KonectyAPIError(errors)
+                raise_for_konecty_errors(errors)
+            response.raise_for_status()
             count = result.get("total", 0)
             return count
 
