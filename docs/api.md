@@ -64,6 +64,57 @@ volume, e é o caminho recomendado para leitura em volume. `sort` vazio signific
 
 Equivalente TypeScript: `KonectySortLimitError` exportado de `@konecty/sdk/Client`.
 
+## Filtro de busca por raio geográfico (`within_radius`)
+
+Filtra registros cujo campo `address` esteja dentro de um raio, em **metros**, a
+partir de um centro. O `term` é o campo `address` puro — o sufixo `.geolocation`
+é acrescentado pelo servidor, não pelo cliente.
+
+```python
+from KonectySdkPython.lib.filters import KonectyFilter, KonectyFindParams
+
+# Porto Alegre, 5 km. O centro é (longitude, latitude) — longitude PRIMEIRO.
+find_filter = KonectyFilter().add_within_radius("address", (-51.2177, -30.0346), 5000)
+
+await client.find("Product", KonectyFindParams(filter=find_filter))
+```
+
+`within_radius_condition("address", (-51.2177, -30.0346), 5000)` monta a mesma
+condição avulsa, para compor à mão.
+
+**A ordem é `[longitude, latitude]`**, a mesma do par já gravado em
+`address.geolocation`. Inverter as duas é o erro mais comum deste operador.
+
+O centro também pode vir de outro registro — "perto do empreendimento X" — sem
+uma ida e volta para descobrir as coordenadas antes:
+
+```python
+KonectyFilter().add_within_radius(
+    "address",
+    {"document": "Development", "_id": "<id>", "field": "address"},
+    2000,
+)
+```
+
+O servidor lê o registro-centro sob controle de acesso completo. `field` é
+obrigatório porque um documento pode ter mais de um campo `address`.
+
+Dois códigos de erro chegam como exceção própria, com a mensagem do servidor
+preservada (ambas subclasses de `KonectyAPIError`):
+
+| Código | Exceção | Quando |
+| --- | --- | --- |
+| `WITHIN_RADIUS_INVALID_VALUE` | `KonectyWithinRadiusValueError` | forma ou faixa do valor recusada (coordenada fora de faixa, string numérica, raio ≤ 0 ou acima do teto) |
+| `WITHIN_RADIUS_CENTER_UNRESOLVED` | `KonectyWithinRadiusCenterError` | o registro-centro não existe, não é legível, ou não tem geolocalização |
+
+O SDK **não** valida faixa nem teto de raio: quem decide é o servidor, e um
+limite copiado aqui passaria a mentir assim que o backend mudasse. Em particular
+string numérica **não** é coagida para número — o servidor a recusa de propósito.
+
+Equivalente TypeScript: `withinRadiusCondition` e os dois códigos exportados de
+`@konecty/sdk/Client`; exceções `KonectyWithinRadiusValueError` e
+`KonectyWithinRadiusCenterError`.
+
 ## Parâmetros do find (GET /rest/data/{module}/find)
 
 Os parâmetros são enviados como query string. O SDK monta esses parâmetros a partir de `KonectyFindParams` e `KonectyFilter` (módulo filters).

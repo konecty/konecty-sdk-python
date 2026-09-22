@@ -63,6 +63,70 @@ class KonectySortLimitError(KonectyAPIError):
         self.code = SORT_ABOVE_MAX_PAGE_SIZE
 
 
+#: Códigos do operador de filtro ``within_radius``. Espelham as constantes de
+#: mesmo nome no SDK TypeScript (``src/sdk/filters/withinRadius.ts``) e no
+#: servidor (``src/imports/data/filters/withinRadius.ts`` no repo Konecty).
+#:
+#: Recusa de forma ou de faixa do valor: ``center`` ou ``radius`` ausente,
+#: coordenada fora da faixa, string numérica no lugar de número, raio não
+#: positivo ou acima do teto do servidor.
+WITHIN_RADIUS_INVALID_VALUE = "WITHIN_RADIUS_INVALID_VALUE"
+
+#: O centro por referência a registro não pôde ser resolvido. Um código só para
+#: os três casos (registro inexistente, ilegível, ou sem geolocalização) é
+#: decisão do servidor: distinguí-los na resposta transformaria o filtro num
+#: oráculo de localização para quem não pode ler o registro.
+WITHIN_RADIUS_CENTER_UNRESOLVED = "WITHIN_RADIUS_CENTER_UNRESOLVED"
+
+
+class KonectyWithinRadiusValueError(KonectyAPIError):
+    """
+    Raised when the server refuses the shape or range of a ``within_radius`` value.
+
+    Carrega o ``code`` legível por máquina e preserva a mensagem do servidor, que
+    nomeia o termo e a chave exata que falhou. Subclasse de ``KonectyAPIError``,
+    então ``except KonectyAPIError`` existente continua pegando.
+
+    O SDK **não** duplica a validação de faixa nem o teto de raio: quem decide é
+    o servidor, e um teto copiado no cliente passa a mentir assim que o backend
+    muda. Mesma postura do ``SORT_ABOVE_MAX_PAGE_SIZE``.
+
+    Espelha ``KonectyWithinRadiusValueError`` no SDK TypeScript — manter os dois
+    em sincronia.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.code = WITHIN_RADIUS_INVALID_VALUE
+
+
+class KonectyWithinRadiusCenterError(KonectyAPIError):
+    """
+    Raised when a ``within_radius`` center given as a record reference could not
+    be resolved — the record does not exist, is not readable, or has no geolocation.
+
+    Espelha ``KonectyWithinRadiusCenterError`` no SDK TypeScript — manter os dois
+    em sincronia.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.code = WITHIN_RADIUS_CENTER_UNRESOLVED
+
+
+#: Códigos que o SDK promove a exceção própria. A tabela existe para que um
+#: código novo seja UMA linha em vez de mais um ``if`` no meio do fluxo — e para
+#: que a lista de códigos suportados seja legível de uma vez, ao lado da lista
+#: equivalente no SDK TypeScript (``ERROR_BY_CODE`` em ``src/sdk/errors.ts``).
+#:
+#: Todo código ausente daqui continua virando ``KonectyAPIError`` genérico.
+_ERROR_BY_CODE = {
+    SORT_ABOVE_MAX_PAGE_SIZE: KonectySortLimitError,
+    WITHIN_RADIUS_INVALID_VALUE: KonectyWithinRadiusValueError,
+    WITHIN_RADIUS_CENTER_UNRESOLVED: KonectyWithinRadiusCenterError,
+}
+
+
 def raise_for_konecty_errors(errors: object) -> None:
     """
     Lança a exceção mais específica que a lista de ``errors`` da API permitir.
@@ -74,11 +138,13 @@ def raise_for_konecty_errors(errors: object) -> None:
     """
     items = errors if isinstance(errors, list) else []
     for error in items:
-        if isinstance(error, dict) and error.get("code") == SORT_ABOVE_MAX_PAGE_SIZE:
-            raise KonectySortLimitError(str(error.get("message", SORT_ABOVE_MAX_PAGE_SIZE)))
+        if not isinstance(error, dict):
+            continue
+        exception_class = _ERROR_BY_CODE.get(error.get("code"))
+        if exception_class is not None:
+            raise exception_class(str(error.get("message", error.get("code"))))
 
     raise KonectyAPIError(errors)
-
 
 class KonectyValidationError(KonectyError):
     """Raised for validation errors."""
