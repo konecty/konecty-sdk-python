@@ -66,6 +66,11 @@ def _normalize_within_radius_center(center: WithinRadiusCenter) -> Any:
     """
     if isinstance(center, Mapping):
         return dict(center)
+    if isinstance(center, (str, bytes)):
+        # `list("12")` daria `["1", "2"]`: o SDK inventaria um par que o chamador não
+        # escreveu, e o servidor recusaria com uma mensagem sobre a coordenada em vez
+        # de sobre o tipo. O SDK TS envia a string intacta; aqui também.
+        return center
     return list(center)
 
 
@@ -97,6 +102,12 @@ def within_radius_condition(
     Espelha ``withinRadiusCondition`` no SDK TypeScript — a mesma entrada produz
     a mesma saída (travado por teste: ``tests/test_within_radius.py`` e
     ``src/__test__/api/withinRadius.test.ts``).
+
+    A ARIDADE difere de propósito: lá é ``withinRadiusCondition(term, {center,
+    radius})``, porque o SDK TypeScript passa objeto de opções em todo lugar;
+    aqui são parâmetros nomeados, que é a convenção deste SDK. A paridade que
+    importa é mesma entrada → mesma saída, não a forma de chamar — uniformizar
+    tornaria um dos dois estranho na própria linguagem.
     """
     return FilterCondition(
         term=term,
@@ -131,13 +142,17 @@ class KonectyFilter(BaseModel):
     """Filtro Konecty."""
 
     match: FilterMatch = Field(FilterMatch.AND, description="Tipo de correspondência")
-    conditions: List[FilterCondition] = Field(default_factory=list, description="Lista de condições")
-    filters: List["KonectyFilter"] = Field(default_factory=list, description="Lista de filtros aninhados")
+    conditions: List[FilterCondition] = Field(
+        default_factory=list, description="Lista de condições"
+    )
+    filters: List["KonectyFilter"] = Field(
+        default_factory=list, description="Lista de filtros aninhados"
+    )
 
     def to_json(self) -> Dict[str, Any]:
         """Converte o filtro para formato JSON."""
         return self.model_dump(mode="json")
-    
+
     def is_empty(self) -> bool:
         """Verifica se o filtro está vazio."""
         return len(self.conditions) == 0 and len(self.filters) == 0
@@ -148,7 +163,9 @@ class KonectyFilter(BaseModel):
         return cls(**data)
 
     @classmethod
-    def create(cls, match: Union[FilterMatch, str] = FilterMatch.AND) -> "KonectyFilter":
+    def create(
+        cls, match: Union[FilterMatch, str] = FilterMatch.AND
+    ) -> "KonectyFilter":
         """Cria uma nova instância de filtro.
 
         Args:
@@ -162,7 +179,11 @@ class KonectyFilter(BaseModel):
         return cls(match=match)
 
     def add_condition(
-        self, term: str, operator: Union[FilterOperator, str], value: Any, disabled: bool = False
+        self,
+        term: str,
+        operator: Union[FilterOperator, str],
+        value: Any,
+        disabled: bool = False,
     ) -> "KonectyFilter":
         """Adiciona uma condição ao filtro.
 
@@ -201,11 +222,17 @@ class KonectyFilter(BaseModel):
 
         Returns:
             Self para encadeamento
+
+        Nota: o SDK TypeScript **não** tem equivalente disto, e é escolha: lá o
+        filtro é objeto literal, não há classe de builder nenhuma, e criar uma só
+        para este operador seria superfície pública nova sem caso de uso.
         """
         self.conditions.append(within_radius_condition(term, center, radius))
         return self
 
-    def add_filter(self, match: Union[FilterMatch, str] = FilterMatch.AND) -> "KonectyFilter":
+    def add_filter(
+        self, match: Union[FilterMatch, str] = FilterMatch.AND
+    ) -> "KonectyFilter":
         """Adiciona um filtro aninhado.
 
         Args:

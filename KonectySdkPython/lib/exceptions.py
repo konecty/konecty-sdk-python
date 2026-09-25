@@ -1,5 +1,7 @@
 """Exceptions for the Konecty SDK."""
 
+from typing import Optional
+
 
 class KonectyError(Exception):
     """Base exception for Konecty errors."""
@@ -70,6 +72,9 @@ class KonectySortLimitError(KonectyAPIError):
 #: Recusa de forma ou de faixa do valor: ``center`` ou ``radius`` ausente,
 #: coordenada fora da faixa, string numérica no lugar de número, raio não
 #: positivo ou acima do teto do servidor.
+#: Nome do operador, usado nas mensagens default. Espelha `WITHIN_RADIUS` no SDK TS.
+WITHIN_RADIUS_OPERATOR = "within_radius"
+
 WITHIN_RADIUS_INVALID_VALUE = "WITHIN_RADIUS_INVALID_VALUE"
 
 #: O centro por referência a registro não pôde ser resolvido. Um código só para
@@ -95,8 +100,13 @@ class KonectyWithinRadiusValueError(KonectyAPIError):
     em sincronia.
     """
 
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
+    #: Default idêntico ao do SDK TS (`message ?? \`Invalid value for operator ${WITHIN_RADIUS}\``
+    #: em `src/sdk/filters/withinRadius.ts`), para que um erro sem `message` produza a MESMA
+    #: frase nos dois — antes o Python levantava com a string literal "None".
+    def __init__(self, message: Optional[str] = None) -> None:
+        super().__init__(
+            message or f"Invalid value for operator {WITHIN_RADIUS_OPERATOR}"
+        )
         self.code = WITHIN_RADIUS_INVALID_VALUE
 
 
@@ -109,8 +119,12 @@ class KonectyWithinRadiusCenterError(KonectyAPIError):
     em sincronia.
     """
 
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
+    #: Mesmo default do SDK TS — ver `KonectyWithinRadiusValueError` acima.
+    def __init__(self, message: Optional[str] = None) -> None:
+        super().__init__(
+            message
+            or f"Could not resolve the center record for operator {WITHIN_RADIUS_OPERATOR}"
+        )
         self.code = WITHIN_RADIUS_CENTER_UNRESOLVED
 
 
@@ -142,9 +156,14 @@ def raise_for_konecty_errors(errors: object) -> None:
             continue
         exception_class = _ERROR_BY_CODE.get(error.get("code"))
         if exception_class is not None:
-            raise exception_class(str(error.get("message", error.get("code"))))
+            # `message` ausente OU `None`: cai no default da própria exceção, como o SDK
+            # TS faz (`new Klass(message ?? undefined)` usa o default do construtor).
+            # `str(None)` produziria a string literal "None" na mensagem do chamador.
+            message = error.get("message")
+            raise exception_class(message) if message else exception_class()
 
     raise KonectyAPIError(errors)
+
 
 class KonectyValidationError(KonectyError):
     """Raised for validation errors."""
