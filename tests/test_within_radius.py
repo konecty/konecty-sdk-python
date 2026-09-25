@@ -36,11 +36,16 @@ import pytest
 
 from KonectySdkPython.lib.client import KonectyClient
 from KonectySdkPython.lib.exceptions import (
+    WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED,
     WITHIN_RADIUS_CENTER_UNRESOLVED,
     WITHIN_RADIUS_INVALID_VALUE,
+    WITHIN_RADIUS_TOO_MANY_CENTERS,
     KonectyAPIError,
+    KonectyWithinRadiusCenterDepthError,
     KonectyWithinRadiusCenterError,
+    KonectyWithinRadiusTooManyCentersError,
     KonectyWithinRadiusValueError,
+    raise_for_konecty_errors,
 )
 from KonectySdkPython.lib.filters import (
     FilterOperator,
@@ -436,4 +441,82 @@ class TestWithinRadiusErrorCodes:
             await client.find("Product", KonectyFindParams(filter=find_filter))
 
         assert not isinstance(excinfo.value, KonectyWithinRadiusValueError)
+        assert not isinstance(excinfo.value, KonectyWithinRadiusCenterError)
+
+
+class TestDepthAndQuotaCodes:
+    """
+    Codigos acrescentados depois, quando o servidor ganhou teto de profundidade e cota
+    de centros por requisicao.
+
+    Paridade com ``src/__test__/api/withinRadius.test.ts`` no SDK TypeScript, describe
+    ``within_radius: profundidade e cota de centros`` — MESMA entrada, MESMA saida.
+
+    As mensagens saem de ``src/imports/data/filters/hydrateFilterCenters.ts`` no repo
+    Konecty. Ja sao TRES textos diferentes sob o guarda-chuva de "centro nao resolvido",
+    e e por isso que o SDK ramifica pelo ``code``, nunca pelo texto.
+    """
+
+    DEPTH_MESSAGE = (
+        "Could not resolve the center record for operator within_radius on term "
+        '"address": center hydration exceeded the maximum depth of 3.'
+    )
+    QUOTA_MESSAGE = (
+        "Operator within_radius resolves at most 20 center records per request; "
+        "this request asked for 34."
+    )
+
+    def test_depth_code_maps_preserving_the_whole_message(self) -> None:
+        with pytest.raises(KonectyWithinRadiusCenterDepthError) as excinfo:
+            raise_for_konecty_errors(
+                [
+                    {
+                        "message": self.DEPTH_MESSAGE,
+                        "code": WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED,
+                    }
+                ]
+            )
+
+        assert excinfo.value.code == WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED
+        assert str(excinfo.value) == self.DEPTH_MESSAGE
+
+    def test_depth_is_catchable_as_center_error(self) -> None:
+        # A hierarquia e a promessa: o codigo novo nao quebra `except` que ja existia.
+        with pytest.raises(KonectyWithinRadiusCenterError):
+            raise_for_konecty_errors(
+                [
+                    {
+                        "message": self.DEPTH_MESSAGE,
+                        "code": WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED,
+                    }
+                ]
+            )
+
+    def test_quota_code_maps_preserving_the_whole_message(self) -> None:
+        with pytest.raises(KonectyWithinRadiusTooManyCentersError) as excinfo:
+            raise_for_konecty_errors(
+                [
+                    {
+                        "message": self.QUOTA_MESSAGE,
+                        "code": WITHIN_RADIUS_TOO_MANY_CENTERS,
+                    }
+                ]
+            )
+
+        assert excinfo.value.code == WITHIN_RADIUS_TOO_MANY_CENTERS
+        assert str(excinfo.value) == self.QUOTA_MESSAGE
+
+    def test_quota_is_not_a_center_failure(self) -> None:
+        # Se cota herdasse de CenterError, o chamador procuraria um registro culpado que
+        # nao existe: a requisicao foi recusada antes de qualquer leitura.
+        with pytest.raises(KonectyWithinRadiusTooManyCentersError) as excinfo:
+            raise_for_konecty_errors(
+                [
+                    {
+                        "message": self.QUOTA_MESSAGE,
+                        "code": WITHIN_RADIUS_TOO_MANY_CENTERS,
+                    }
+                ]
+            )
+
         assert not isinstance(excinfo.value, KonectyWithinRadiusCenterError)
