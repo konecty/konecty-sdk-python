@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, TypedDict, Union
 
 from pydantic import BaseModel, Field
 
@@ -29,6 +29,91 @@ class FilterOperator(str, Enum):
     IN = "in"
     NOT_IN = "not_in"
     EXISTS = "exists"
+    #: Busca por raio geográfico em campo de tipo ``address``. Espelha
+    #: ``WITHIN_RADIUS`` no SDK TypeScript — manter os dois em sincronia.
+    WITHIN_RADIUS = "within_radius"
+
+
+#: Referência ao registro de onde tirar o centro, em vez de um par literal:
+#: "perto do empreendimento X". O servidor lê o registro sob controle de acesso
+#: completo e substitui pelo par antes de compilar a query.
+#:
+#: ``field`` é obrigatório porque um documento pode ter mais de um campo
+#: ``address`` e adivinhar seria escolher em silêncio.
+WithinRadiusCenterRef = TypedDict(
+    "WithinRadiusCenterRef",
+    {"document": str, "_id": str, "field": str},
+)
+
+#: Par de coordenadas do centro, na ordem **``[longitude, latitude]``**.
+#:
+#: Longitude PRIMEIRO. É a ordem do par já gravado em ``address.geolocation`` e a
+#: que o Mongo consome, e é o erro nº 1 que se comete aqui. Porto Alegre, por
+#: exemplo, é ``(-51.2177, -30.0346)`` — longitude ~ -51, latitude ~ -30.
+WithinRadiusCoordinatePair = Union[Tuple[float, float], Sequence[float]]
+
+WithinRadiusCenter = Union[WithinRadiusCoordinatePair, WithinRadiusCenterRef]
+
+
+def _normalize_within_radius_center(center: WithinRadiusCenter) -> Any:
+    """
+    Põe o centro na forma que vai para o JSON, sem validar faixa nem tipo.
+
+    Uma referência a registro vira ``dict``; um par vira ``list`` — nesta ordem,
+    ``[longitude, latitude]``. Nada é convertido para número: string numérica é
+    recusada pelo SERVIDOR, de propósito, e coagir aqui esconderia o erro do
+    chamador em vez de reportá-lo.
+    """
+    if isinstance(center, Mapping):
+        return dict(center)
+    if isinstance(center, (str, bytes)):
+        # `list("12")` daria `["1", "2"]`: o SDK inventaria um par que o chamador não
+        # escreveu, e o servidor recusaria com uma mensagem sobre a coordenada em vez
+        # de sobre o tipo. O SDK TS envia a string intacta; aqui também.
+        return center
+    return list(center)
+
+
+def within_radius_condition(
+    term: str,
+    center: WithinRadiusCenter,
+    radius: float,
+) -> "FilterCondition":
+    """
+    Monta a condição de filtro do operador ``within_radius``.
+
+    O ``term`` é o campo ``address`` puro: o sufixo ``.geolocation`` é
+    acrescentado pelo SERVIDOR, não pelo cliente. O ``radius`` é em **metros**.
+
+    Existe para que a ordem ``[longitude, latitude]`` e o raio em metros
+    apareçam uma vez, tipados, em vez de serem redigitados como dicionário
+    literal em cada chamada — que é onde a inversão das coordenadas entra.
+
+    .. code-block:: python
+
+        within_radius_condition("address", (-51.2177, -30.0346), 5000)
+        # term="address", operator=within_radius,
+        # value={"center": [-51.2177, -30.0346], "radius": 5000}
+
+    O SDK **não** valida faixa nem teto de raio: quem decide é o servidor, e um
+    teto copiado aqui passaria a mentir assim que o backend mudasse. Valor
+    recusado volta como ``WITHIN_RADIUS_INVALID_VALUE``.
+
+    Espelha ``withinRadiusCondition`` no SDK TypeScript — a mesma entrada produz
+    a mesma saída (travado por teste: ``tests/test_within_radius.py`` e
+    ``src/__test__/api/withinRadius.test.ts``).
+
+    A ARIDADE difere de propósito: lá é ``withinRadiusCondition(term, {center,
+    radius})``, porque o SDK TypeScript passa objeto de opções em todo lugar;
+    aqui são parâmetros nomeados, que é a convenção deste SDK. A paridade que
+    importa é mesma entrada → mesma saída, não a forma de chamar — uniformizar
+    tornaria um dos dois estranho na própria linguagem.
+    """
+    return FilterCondition(
+        term=term,
+        operator=FilterOperator.WITHIN_RADIUS,
+        value={"center": _normalize_within_radius_center(center), "radius": radius},
+    )
 
 
 class DateValue(BaseModel):
@@ -57,13 +142,17 @@ class KonectyFilter(BaseModel):
     """Filtro Konecty."""
 
     match: FilterMatch = Field(FilterMatch.AND, description="Tipo de correspondência")
-    conditions: List[FilterCondition] = Field(default_factory=list, description="Lista de condições")
-    filters: List["KonectyFilter"] = Field(default_factory=list, description="Lista de filtros aninhados")
+    conditions: List[FilterCondition] = Field(
+        default_factory=list, description="Lista de condições"
+    )
+    filters: List["KonectyFilter"] = Field(
+        default_factory=list, description="Lista de filtros aninhados"
+    )
 
     def to_json(self) -> Dict[str, Any]:
         """Converte o filtro para formato JSON."""
         return self.model_dump(mode="json")
-    
+
     def is_empty(self) -> bool:
         """Verifica se o filtro está vazio."""
         return len(self.conditions) == 0 and len(self.filters) == 0
@@ -74,7 +163,9 @@ class KonectyFilter(BaseModel):
         return cls(**data)
 
     @classmethod
-    def create(cls, match: Union[FilterMatch, str] = FilterMatch.AND) -> "KonectyFilter":
+    def create(
+        cls, match: Union[FilterMatch, str] = FilterMatch.AND
+    ) -> "KonectyFilter":
         """Cria uma nova instância de filtro.
 
         Args:
@@ -88,7 +179,11 @@ class KonectyFilter(BaseModel):
         return cls(match=match)
 
     def add_condition(
-        self, term: str, operator: Union[FilterOperator, str], value: Any, disabled: bool = False
+        self,
+        term: str,
+        operator: Union[FilterOperator, str],
+        value: Any,
+        disabled: bool = False,
     ) -> "KonectyFilter":
         """Adiciona uma condição ao filtro.
 
@@ -114,7 +209,30 @@ class KonectyFilter(BaseModel):
         )
         return self
 
-    def add_filter(self, match: Union[FilterMatch, str] = FilterMatch.AND) -> "KonectyFilter":
+    def add_within_radius(
+        self, term: str, center: WithinRadiusCenter, radius: float
+    ) -> "KonectyFilter":
+        """Adiciona uma condição ``within_radius`` ao filtro.
+
+        Args:
+            term: Campo de tipo ``address`` (sem o sufixo ``.geolocation``)
+            center: ``(longitude, latitude)`` — longitude PRIMEIRO — ou a
+                referência ``{"document", "_id", "field"}`` a outro registro
+            radius: Raio em **metros**
+
+        Returns:
+            Self para encadeamento
+
+        Nota: o SDK TypeScript **não** tem equivalente disto, e é escolha: lá o
+        filtro é objeto literal, não há classe de builder nenhuma, e criar uma só
+        para este operador seria superfície pública nova sem caso de uso.
+        """
+        self.conditions.append(within_radius_condition(term, center, radius))
+        return self
+
+    def add_filter(
+        self, match: Union[FilterMatch, str] = FilterMatch.AND
+    ) -> "KonectyFilter":
         """Adiciona um filtro aninhado.
 
         Args:

@@ -64,6 +64,90 @@ volume, e é o caminho recomendado para leitura em volume. `sort` vazio signific
 
 Equivalente TypeScript: `KonectySortLimitError` exportado de `@konecty/sdk/Client`.
 
+## Filtro de busca por raio geográfico (`within_radius`)
+
+Filtra registros cujo campo `address` esteja dentro de um raio, em **metros**, a
+partir de um centro. O `term` é o campo `address` puro — o sufixo `.geolocation`
+é acrescentado pelo servidor, não pelo cliente.
+
+```python
+from KonectySdkPython.lib.filters import KonectyFilter, KonectyFindParams
+
+# Porto Alegre, 5 km. O centro é (longitude, latitude) — longitude PRIMEIRO.
+find_filter = KonectyFilter().add_within_radius("address", (-51.2177, -30.0346), 5000)
+
+await client.find("Product", KonectyFindParams(filter=find_filter))
+```
+
+`within_radius_condition("address", (-51.2177, -30.0346), 5000)` monta a mesma
+condição avulsa, para compor à mão.
+
+**A ordem é `[longitude, latitude]`**, a mesma do par já gravado em
+`address.geolocation`. Inverter as duas é o erro mais comum deste operador.
+
+O centro também pode vir de outro registro — "perto do empreendimento X" — sem
+uma ida e volta para descobrir as coordenadas antes:
+
+```python
+KonectyFilter().add_within_radius(
+    "address",
+    {"document": "Development", "_id": "<id>", "field": "address"},
+    2000,
+)
+```
+
+O servidor lê o registro-centro sob controle de acesso completo. `field` é
+obrigatório porque um documento pode ter mais de um campo `address`.
+
+Dois códigos de erro chegam como exceção própria, com a mensagem do servidor
+preservada (ambas subclasses de `KonectyAPIError`):
+
+| Código | Exceção | Quando |
+| --- | --- | --- |
+| `WITHIN_RADIUS_INVALID_VALUE` | `KonectyWithinRadiusValueError` | forma ou faixa do valor recusada (coordenada fora de faixa, string numérica, raio ≤ 0 ou acima do teto) |
+| `WITHIN_RADIUS_CENTER_UNRESOLVED` | `KonectyWithinRadiusCenterError` | o registro-centro não existe, não é legível, ou não tem geolocalização |
+
+O SDK **não** valida faixa nem teto de raio: quem decide é o servidor, e um
+limite copiado aqui passaria a mentir assim que o backend mudasse. Em particular
+string numérica **não** é coagida para número — o servidor a recusa de propósito.
+
+### `WITHIN_RADIUS_CENTER_UNRESOLVED`: o id de correlação é o caminho de suporte
+
+Três causas produzem esse código — o registro-centro **não existe**, existe mas
+**não é legível** para o usuário da requisição, ou é legível mas **não tem
+geolocalização** gravada. A resposta não diz qual: distinguí-las transformaria o
+filtro num oráculo, e quem não pode ler o registro descobriria se ele existe e
+onde fica variando o raio até a resposta mudar.
+
+A causa real fica no **log do servidor**, e a mensagem devolvida termina com o id
+que aponta para a linha correspondente:
+
+```
+Could not resolve the center record for operator within_radius on term "address". Correlation id: 7b3f2a9c41d8
+```
+
+O id tem doze caracteres hexadecimais, ou 32 quando há tracing ativo (aí ele **é**
+o `traceId` do span, e serve direto como chave de busca no log). O SDK entrega a
+mensagem **inteira** em `str(exc)` — não a trunca nem a reescreve. Ao reportar o
+problema, **mande o id**: sem ele não há como achar a linha, e o suporte terá de
+pedir data, hora aproximada e namespace.
+
+Nem toda mensagem com esse código traz um id. O mesmo código recusa também um
+centro por referência que chega por um caminho que **não hidrata** — `update` e
+`findById`, contra `find`, stream/export e lookup, que hidratam — e essa recusa
+tem texto próprio, sem id:
+
+```
+Could not resolve the center record for operator within_radius on term "address". A center by record reference is resolved only on read paths (find, stream/export and lookup) and is not supported here.
+```
+
+Ou seja: ramifique pelo `.code`, e **mostre a mensagem** ao usuário em vez de
+casar com o texto dela.
+
+Equivalente TypeScript: `withinRadiusCondition` e os dois códigos exportados de
+`@konecty/sdk/Client`; exceções `KonectyWithinRadiusValueError` e
+`KonectyWithinRadiusCenterError`.
+
 ## Parâmetros do find (GET /rest/data/{module}/find)
 
 Os parâmetros são enviados como query string. O SDK monta esses parâmetros a partir de `KonectyFindParams` e `KonectyFilter` (módulo filters).

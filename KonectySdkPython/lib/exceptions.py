@@ -1,5 +1,7 @@
 """Exceptions for the Konecty SDK."""
 
+from typing import Optional
+
 
 class KonectyError(Exception):
     """Base exception for Konecty errors."""
@@ -63,6 +65,136 @@ class KonectySortLimitError(KonectyAPIError):
         self.code = SORT_ABOVE_MAX_PAGE_SIZE
 
 
+#: Códigos do operador de filtro ``within_radius``. Espelham as constantes de
+#: mesmo nome no SDK TypeScript (``src/sdk/filters/withinRadius.ts``) e no
+#: servidor (``src/imports/data/filters/withinRadius.ts`` no repo Konecty).
+#:
+#: Recusa de forma ou de faixa do valor: ``center`` ou ``radius`` ausente,
+#: coordenada fora da faixa, string numérica no lugar de número, raio não
+#: positivo ou acima do teto do servidor.
+#: Nome do operador, usado nas mensagens default. Espelha `WITHIN_RADIUS` no SDK TS.
+WITHIN_RADIUS_OPERATOR = "within_radius"
+
+WITHIN_RADIUS_INVALID_VALUE = "WITHIN_RADIUS_INVALID_VALUE"
+
+#: O centro por referência a registro não pôde ser resolvido. Um código só para
+#: os três casos (registro inexistente, ilegível, ou sem geolocalização) é
+#: decisão do servidor: distinguí-los na resposta transformaria o filtro num
+#: oráculo de localização para quem não pode ler o registro.
+WITHIN_RADIUS_CENTER_UNRESOLVED = "WITHIN_RADIUS_CENTER_UNRESOLVED"
+
+#: A cadeia de centros por referência passou do teto de profundidade do servidor.
+#: Acontece quando um centro aponta para um registro cujo filtro de leitura tem, ele
+#: próprio, um `within_radius` com centro por referência — a resolução é recursiva e o
+#: servidor corta. Não é erro do valor enviado: é configuração de metadado do documento
+#: alvo. Espelha `WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED` no SDK TS.
+WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED = "WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED"
+
+#: A requisição pediu mais centros por referência do que o servidor resolve de uma vez.
+#: O SDK **não** duplica o teto: quem decide é o servidor, e um número copiado aqui
+#: passaria a mentir assim que o backend mudasse. Espelha `WITHIN_RADIUS_TOO_MANY_CENTERS`
+#: no SDK TS.
+WITHIN_RADIUS_TOO_MANY_CENTERS = "WITHIN_RADIUS_TOO_MANY_CENTERS"
+
+
+class KonectyWithinRadiusValueError(KonectyAPIError):
+    """
+    Raised when the server refuses the shape or range of a ``within_radius`` value.
+
+    Carrega o ``code`` legível por máquina e preserva a mensagem do servidor, que
+    nomeia o termo e a chave exata que falhou. Subclasse de ``KonectyAPIError``,
+    então ``except KonectyAPIError`` existente continua pegando.
+
+    O SDK **não** duplica a validação de faixa nem o teto de raio: quem decide é
+    o servidor, e um teto copiado no cliente passa a mentir assim que o backend
+    muda. Mesma postura do ``SORT_ABOVE_MAX_PAGE_SIZE``.
+
+    Espelha ``KonectyWithinRadiusValueError`` no SDK TypeScript — manter os dois
+    em sincronia.
+    """
+
+    #: Default idêntico ao do SDK TS (`message ?? \`Invalid value for operator ${WITHIN_RADIUS}\``
+    #: em `src/sdk/filters/withinRadius.ts`), para que um erro sem `message` produza a MESMA
+    #: frase nos dois — antes o Python levantava com a string literal "None".
+    def __init__(self, message: Optional[str] = None) -> None:
+        super().__init__(
+            message or f"Invalid value for operator {WITHIN_RADIUS_OPERATOR}"
+        )
+        self.code = WITHIN_RADIUS_INVALID_VALUE
+
+
+class KonectyWithinRadiusCenterError(KonectyAPIError):
+    """
+    Raised when a ``within_radius`` center given as a record reference could not
+    be resolved — the record does not exist, is not readable, or has no geolocation.
+
+    Espelha ``KonectyWithinRadiusCenterError`` no SDK TypeScript — manter os dois
+    em sincronia.
+    """
+
+    #: Mesmo default do SDK TS — ver `KonectyWithinRadiusValueError` acima.
+    def __init__(self, message: Optional[str] = None) -> None:
+        super().__init__(
+            message
+            or f"Could not resolve the center record for operator {WITHIN_RADIUS_OPERATOR}"
+        )
+        self.code = WITHIN_RADIUS_CENTER_UNRESOLVED
+
+
+class KonectyWithinRadiusCenterDepthError(KonectyWithinRadiusCenterError):
+    """
+    Raised when the chain of center-by-reference resolutions exceeds the server depth cap.
+
+    **Herda de ``KonectyWithinRadiusCenterError`` de propósito**, como no SDK TS: é uma
+    falha de resolução de centro, e a própria mensagem do servidor começa com "Could not
+    resolve the center record". Quem escreveu ``except KonectyWithinRadiusCenterError``
+    antes deste código existir continua pegando.
+
+    Espelha ``KonectyWithinRadiusCenterDepthError`` no SDK TypeScript.
+    """
+
+    def __init__(self, message: Optional[str] = None) -> None:
+        super().__init__(
+            message
+            or f"Center hydration exceeded the maximum depth for operator {WITHIN_RADIUS_OPERATOR}"
+        )
+        self.code = WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED
+
+
+class KonectyWithinRadiusTooManyCentersError(KonectyAPIError):
+    """
+    Raised when the request asks for more center records than the server resolves at once.
+
+    **NÃO** herda de ``KonectyWithinRadiusCenterError``: nenhum centro específico falhou —
+    a requisição inteira foi recusada antes de qualquer leitura. Tratar cota como falha de
+    centro levaria o chamador a procurar um registro culpado que não existe.
+
+    Espelha ``KonectyWithinRadiusTooManyCentersError`` no SDK TypeScript.
+    """
+
+    def __init__(self, message: Optional[str] = None) -> None:
+        super().__init__(
+            message
+            or f"Too many center records requested for operator {WITHIN_RADIUS_OPERATOR}"
+        )
+        self.code = WITHIN_RADIUS_TOO_MANY_CENTERS
+
+
+#: Códigos que o SDK promove a exceção própria. A tabela existe para que um
+#: código novo seja UMA linha em vez de mais um ``if`` no meio do fluxo — e para
+#: que a lista de códigos suportados seja legível de uma vez, ao lado da lista
+#: equivalente no SDK TypeScript (``ERROR_BY_CODE`` em ``src/sdk/errors.ts``).
+#:
+#: Todo código ausente daqui continua virando ``KonectyAPIError`` genérico.
+_ERROR_BY_CODE = {
+    SORT_ABOVE_MAX_PAGE_SIZE: KonectySortLimitError,
+    WITHIN_RADIUS_INVALID_VALUE: KonectyWithinRadiusValueError,
+    WITHIN_RADIUS_CENTER_UNRESOLVED: KonectyWithinRadiusCenterError,
+    WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED: KonectyWithinRadiusCenterDepthError,
+    WITHIN_RADIUS_TOO_MANY_CENTERS: KonectyWithinRadiusTooManyCentersError,
+}
+
+
 def raise_for_konecty_errors(errors: object) -> None:
     """
     Lança a exceção mais específica que a lista de ``errors`` da API permitir.
@@ -74,8 +206,15 @@ def raise_for_konecty_errors(errors: object) -> None:
     """
     items = errors if isinstance(errors, list) else []
     for error in items:
-        if isinstance(error, dict) and error.get("code") == SORT_ABOVE_MAX_PAGE_SIZE:
-            raise KonectySortLimitError(str(error.get("message", SORT_ABOVE_MAX_PAGE_SIZE)))
+        if not isinstance(error, dict):
+            continue
+        exception_class = _ERROR_BY_CODE.get(error.get("code"))
+        if exception_class is not None:
+            # `message` ausente OU `None`: cai no default da própria exceção, como o SDK
+            # TS faz (`new Klass(message ?? undefined)` usa o default do construtor).
+            # `str(None)` produziria a string literal "None" na mensagem do chamador.
+            message = error.get("message")
+            raise exception_class(message) if message else exception_class()
 
     raise KonectyAPIError(errors)
 
