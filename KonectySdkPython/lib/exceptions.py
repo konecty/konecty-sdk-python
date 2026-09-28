@@ -69,9 +69,10 @@ class KonectySortLimitError(KonectyAPIError):
 #: mesmo nome no SDK TypeScript (``src/sdk/filters/withinRadius.ts``) e no
 #: servidor (``src/imports/data/filters/withinRadius.ts`` no repo Konecty).
 #:
-#: Recusa de forma ou de faixa do valor: ``center`` ou ``radius`` ausente,
-#: coordenada fora da faixa, string numérica no lugar de número, raio não
-#: positivo ou acima do teto do servidor.
+#: Recusa de forma ou de faixa do valor: ``lat``/``lng`` (ou ``record``) ou
+#: ``radius`` ausente, as duas formas juntas, chave desconhecida, coordenada fora
+#: da faixa, string numérica no lugar de número, raio não positivo ou acima do
+#: teto do servidor.
 #: Nome do operador, usado nas mensagens default. Espelha `WITHIN_RADIUS` no SDK TS.
 WITHIN_RADIUS_OPERATOR = "within_radius"
 
@@ -95,6 +96,12 @@ WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED = "WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED"
 #: passaria a mentir assim que o backend mudasse. Espelha `WITHIN_RADIUS_TOO_MANY_CENTERS`
 #: no SDK TS.
 WITHIN_RADIUS_TOO_MANY_CENTERS = "WITHIN_RADIUS_TOO_MANY_CENTERS"
+
+#: Recusa de ordenação por ``_distance``: o filtro não tem exatamente um
+#: ``within_radius`` no caminho AND, ou o usuário não pode ler (ou só lê sob
+#: condição) o campo ``address`` do centro. O servidor responde HTTP 400; a mensagem
+#: diz qual dos dois casos é. Espelha ``DISTANCE_SORT_UNAVAILABLE`` no SDK TS.
+DISTANCE_SORT_UNAVAILABLE = "DISTANCE_SORT_UNAVAILABLE"
 
 
 class KonectyWithinRadiusValueError(KonectyAPIError):
@@ -180,6 +187,25 @@ class KonectyWithinRadiusTooManyCentersError(KonectyAPIError):
         self.code = WITHIN_RADIUS_TOO_MANY_CENTERS
 
 
+class KonectyDistanceSortUnavailableError(KonectyAPIError):
+    """
+    Raised when the server refuses a sort by ``_distance``.
+
+    **NÃO** herda de ``KonectySortLimitError``: não é teto de página, e a saída não é
+    ordenar por ``_id`` — é acertar o filtro (um ``within_radius`` só, no caminho AND)
+    ou a permissão de leitura do campo ``address``.
+
+    Espelha ``KonectyDistanceSortUnavailableError`` no SDK TypeScript.
+    """
+
+    #: Mesmo default do SDK TS (`src/sdk/filters/withinRadius.ts`).
+    def __init__(self, message: Optional[str] = None) -> None:
+        super().__init__(
+            message or "Sorting by _distance is not available for this query"
+        )
+        self.code = DISTANCE_SORT_UNAVAILABLE
+
+
 #: Códigos que o SDK promove a exceção própria. A tabela existe para que um
 #: código novo seja UMA linha em vez de mais um ``if`` no meio do fluxo — e para
 #: que a lista de códigos suportados seja legível de uma vez, ao lado da lista
@@ -192,6 +218,7 @@ _ERROR_BY_CODE = {
     WITHIN_RADIUS_CENTER_UNRESOLVED: KonectyWithinRadiusCenterError,
     WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED: KonectyWithinRadiusCenterDepthError,
     WITHIN_RADIUS_TOO_MANY_CENTERS: KonectyWithinRadiusTooManyCentersError,
+    DISTANCE_SORT_UNAVAILABLE: KonectyDistanceSortUnavailableError,
 }
 
 

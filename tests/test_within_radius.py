@@ -7,16 +7,19 @@ espera a MESMA saída. Alterar um destes literais sem alterar o outro arquivo
 quebra a paridade que esta feature existe para garantir.
 
 O contrato é do servidor (``src/imports/data/filters/withinRadius.ts`` no repo
-Konecty): ``value: {"center": [longitude, latitude] | {"document","_id","field"},
-"radius": <metros>}``. O SDK **não** duplica a validação de faixa nem o teto de
+Konecty, Revisão 2 da spec ``geo-radius-filter``): ``value: {"lat", "lng",
+"radius"} | {"record": {"document","_id","field"}, "radius"}``, raio em metros. A
+forma antiga ``{"center": [lng, lat] | {...}, "radius"}`` deixou de existir. Cada
+registro de ``find`` pode trazer ``_distance`` (metros, inteiro), e
+``sort: [{"property": "_distance", "direction"}]`` ordena por ele. O SDK **não** duplica a validação de faixa nem o teto de
 raio — quem decide é o servidor, e um teto copiado aqui passaria a mentir assim
 que o backend mudasse. Mesma postura do ``SORT_ABOVE_MAX_PAGE_SIZE``.
 
 Assimetrias com o SDK TypeScript que são ESCOLHA, não defeito
 -------------------------------------------------------------
 
-1. **Aridade.** Aqui é ``within_radius_condition(term, center, radius)``; no TS é
-   ``withinRadiusCondition(term, {center, radius})``. Mantidas assim de
+1. **Aridade.** Aqui é ``within_radius_condition(term, lat=, lng=, radius=)``; no
+   TS é ``withinRadiusCondition(term, {lat, lng, radius})``. Mantidas assim de
    propósito: cada linguagem segue a convenção do próprio SDK — o TS passa
    objeto de opções em todo lugar, o Python passa parâmetros nomeados. O que a
    paridade exige é mesma ENTRADA → mesma SAÍDA, e é isso que os literais deste
@@ -36,11 +39,14 @@ import pytest
 
 from KonectySdkPython.lib.client import KonectyClient
 from KonectySdkPython.lib.exceptions import (
+    DISTANCE_SORT_UNAVAILABLE,
     WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED,
     WITHIN_RADIUS_CENTER_UNRESOLVED,
     WITHIN_RADIUS_INVALID_VALUE,
     WITHIN_RADIUS_TOO_MANY_CENTERS,
     KonectyAPIError,
+    KonectyDistanceSortUnavailableError,
+    KonectySortLimitError,
     KonectyWithinRadiusCenterDepthError,
     KonectyWithinRadiusCenterError,
     KonectyWithinRadiusTooManyCentersError,
@@ -48,17 +54,21 @@ from KonectySdkPython.lib.exceptions import (
     raise_for_konecty_errors,
 )
 from KonectySdkPython.lib.filters import (
+    DISTANCE_FIELD,
     FilterOperator,
     KonectyFilter,
     KonectyFindParams,
+    SortDirection,
+    SortOrder,
     within_radius_condition,
 )
 
 #: O termo é o campo ``address`` puro: o sufixo ``.geolocation`` é do servidor.
 TERM = "address"
 
-#: Porto Alegre, em ``(longitude, latitude)`` — longitude ~ -51, latitude ~ -30.
-CENTER = (-51.2177, -30.0346)
+#: Porto Alegre — latitude ~ -30, longitude ~ -51: sinais e magnitudes distinguíveis.
+LAT = -30.0346
+LNG = -51.2177
 RADIUS_METERS = 5000
 
 CENTER_REF = {"document": "Development", "_id": "dev-1", "field": "address"}
@@ -85,17 +95,35 @@ CENTER_REF = {"document": "Development", "_id": "dev-1", "field": "address"}
 #: os testes abaixo isolam o que este operador de fato põe na requisição.
 EXPECTED_CONDITION_JSON = (
     '{"term":"address","operator":"within_radius",'
-    '"value":{"center":[-51.2177,-30.0346],"radius":5000}}'
+    '"value":{"lat":-30.0346,"lng":-51.2177,"radius":5000}}'
 )
 
 EXPECTED_CENTER_REF_CONDITION_JSON = (
     '{"term":"address","operator":"within_radius",'
-    '"value":{"center":{"document":"Development","_id":"dev-1","field":"address"},"radius":5000}}'
+    '"value":{"record":{"document":"Development","_id":"dev-1","field":"address"},"radius":5000}}'
 )
 
+#: Ordenação por distância, serializada. O SDK TypeScript assevera o MESMO JSON
+#: (``EXPECTED_DISTANCE_SORT_JSON``).
+EXPECTED_DISTANCE_SORT_JSON = '[{"property":"_distance","direction":"ASC"}]'
+
+#: Mensagem de recusa de faixa no formato da Revisão 2 (nomeia a chave e a faixa,
+#: GEO-12.5). O servidor é alterado em paralelo; o SDK repassa o texto sem
+#: interpretá-lo, então o literal serve de amostra — o que este arquivo trava é o
+#: ``code`` e a mensagem chegar INTEIRA. MESMO literal do SDK TypeScript.
 INVALID_VALUE_MESSAGE = (
     'Invalid value for operator within_radius on term "address": '
-    "center must be an array of exactly 2 numbers, in the order [longitude, latitude]"
+    "lat must be a finite number between -90 and 90"
+)
+
+#: As duas recusas de ``DISTANCE_SORT_UNAVAILABLE`` (GEO-14.3 e GEO-15.3): mesmo
+#: código, mensagens distintas. MESMOS literais do SDK TypeScript.
+DISTANCE_SORT_NO_CENTER_MESSAGE = (
+    "Sorting by _distance requires exactly one within_radius condition "
+    "on the AND path of the filter"
+)
+DISTANCE_SORT_NO_ACCESS_MESSAGE = (
+    "Sorting by _distance requires read access to field address"
 )
 
 #: Id de correlação de exemplo, no formato que o servidor emite: doze caracteres
@@ -149,51 +177,81 @@ class TestWithinRadiusCondition:
     """Montagem da condição — espelha o describe homônimo no teste do TS."""
 
     def test_builds_term_operator_value_with_literal_center(self) -> None:
-        condition = within_radius_condition(TERM, CENTER, RADIUS_METERS)
+        condition = within_radius_condition(
+            TERM, lat=LAT, lng=LNG, radius=RADIUS_METERS
+        )
 
         assert condition.operator == FilterOperator.WITHIN_RADIUS
         assert condition.operator.value == "within_radius"
         assert _condition_json(condition) == EXPECTED_CONDITION_JSON
 
-    def test_preserves_coordinate_order_longitude_first(self) -> None:
-        # O erro nº 1 deste operador é inverter as duas. O teste fixa a ordem com
-        # valores de sinais e magnitudes distinguíveis (-51 lng, -30 lat).
-        condition = within_radius_condition(TERM, CENTER, RADIUS_METERS)
-        center = condition.value["center"]
+    def test_lat_and_lng_stay_in_the_key_that_names_them(self) -> None:
+        condition = within_radius_condition(
+            TERM, lat=LAT, lng=LNG, radius=RADIUS_METERS
+        )
 
-        assert center[0] == -51.2177
-        assert center[1] == -30.0346
+        assert condition.value["lat"] == -30.0346
+        assert condition.value["lng"] == -51.2177
 
     def test_accepts_center_by_record_reference(self) -> None:
-        condition = within_radius_condition(TERM, CENTER_REF, RADIUS_METERS)
+        condition = within_radius_condition(
+            TERM, record=CENTER_REF, radius=RADIUS_METERS
+        )
 
         assert _condition_json(condition) == EXPECTED_CENTER_REF_CONDITION_JSON
 
     def test_add_within_radius_appends_the_same_condition(self) -> None:
-        built = KonectyFilter().add_within_radius(TERM, CENTER, RADIUS_METERS)
+        built = KonectyFilter().add_within_radius(
+            TERM, lat=LAT, lng=LNG, radius=RADIUS_METERS
+        )
 
         assert len(built.conditions) == 1
         assert _condition_json(built.conditions[0]) == EXPECTED_CONDITION_JSON
 
     def test_numeric_strings_are_not_coerced(self) -> None:
-        # O servidor recusa string numérica de propósito (GEO-02). Coagir aqui
-        # esconderia o erro do chamador em vez de reportá-lo.
+        # Paridade com 'não coage string numérica — deixa o servidor recusar' em
+        # ``src/__test__/api/withinRadius.test.ts``. O servidor recusa string numérica
+        # de propósito (GEO-12.5). Coagir aqui esconderia o erro do chamador.
         condition = within_radius_condition(
-            TERM, ("-51.2177", "-30.0346"), RADIUS_METERS
+            TERM, lat="-30.0346", lng="-51.2177", radius=RADIUS_METERS  # type: ignore[arg-type]
         )
 
-        assert condition.value["center"] == ["-51.2177", "-30.0346"]
+        assert condition.value == {
+            "lat": "-30.0346",
+            "lng": "-51.2177",
+            "radius": RADIUS_METERS,
+        }
 
-    def test_a_string_center_is_sent_whole_instead_of_being_split(self) -> None:
-        """Centro em ``str`` vai intacto — ``list("12")`` daria ``["1", "2"]``.
+    def test_legacy_center_form_is_not_accepted(self) -> None:
+        """A forma antiga não é aceita pelo builder — nem posicional, nem nomeada.
 
-        O SDK inventaria um par que o chamador não escreveu, e o servidor
-        recusaria nomeando a coordenada em vez do tipo. O SDK TypeScript envia a
-        string como veio; aqui também.
+        Paridade com 'a forma antiga { center, radius } não é aceita pelo tipo' no
+        SDK TypeScript, onde a trava é de compilação.
         """
-        condition = within_radius_condition(TERM, "-51.2177", RADIUS_METERS)
+        with pytest.raises(TypeError):
+            within_radius_condition(TERM, (LNG, LAT), RADIUS_METERS)  # type: ignore[misc]
+        with pytest.raises(TypeError):
+            within_radius_condition(TERM, center=(LNG, LAT), radius=RADIUS_METERS)  # type: ignore[call-arg]
+        with pytest.raises(TypeError):
+            KonectyFilter().add_within_radius(TERM, (LNG, LAT), RADIUS_METERS)  # type: ignore[misc]
 
-        assert condition.value["center"] == "-51.2177"
+    def test_mixed_shape_is_forwarded_for_the_server_to_refuse(self) -> None:
+        """As duas formas juntas vão ao servidor intactas, para ele nomear o problema.
+
+        Paridade com 'repassa ao servidor, sem remontar, o valor que o tipo
+        recusaria — para ele nomear a chave' em ``src/__test__/api/withinRadius.test.ts``:
+        MESMA entrada, MESMO JSON. O servidor recusa com "mutually exclusive"
+        (GEO-12.3); descartar uma das formas aqui trocaria essa mensagem por outra.
+        """
+        condition = within_radius_condition(
+            TERM, lat=LAT, lng=LNG, record=CENTER_REF, radius=RADIUS_METERS
+        )
+
+        assert json.dumps(condition.value, separators=(",", ":")) == (
+            '{"lat":-30.0346,"lng":-51.2177,'
+            '"record":{"document":"Development","_id":"dev-1","field":"address"},'
+            '"radius":5000}'
+        )
 
     def test_float_radius_keeps_the_float_the_caller_passed(self) -> None:
         """Raio ``float`` sai como ``float`` — e é aqui que a paridade LITERAL para.
@@ -205,18 +263,12 @@ class TestWithinRadiusCondition:
 
         **Não convergimos, de propósito.** Convergir exigiria o SDK converter
         ``float`` para ``int`` quando o valor é inteiro — exatamente a coerção
-        silenciosa que este SDK recusa a fazer em ``center`` (ver
-        ``test_numeric_strings_are_not_coerced``): o valor que vai para a rede
-        deixaria de ser o valor que o chamador escreveu. E a divergência é
+        silenciosa que este SDK recusa a fazer nas coordenadas (ver
+        ``test_numeric_strings_are_not_coerced``). E a divergência é
         semanticamente neutra: o servidor faz ``JSON.parse`` do filtro, onde
-        ``5000`` e ``5000.0`` produzem o mesmo ``number``, e o schema do raio
-        (``z.number().finite().positive()``) aceita os dois igualmente.
-
-        O que este teste fixa é o ESCOPO da afirmação de paridade byte a byte:
-        ela vale para raio inteiro, e não para raio float. Se algum dia o SDK
-        passar a normalizar, é este teste que muda — não um comentário.
+        ``5000`` e ``5000.0`` produzem o mesmo ``number``.
         """
-        condition = within_radius_condition(TERM, CENTER, 5000.0)
+        condition = within_radius_condition(TERM, lat=LAT, lng=LNG, radius=5000.0)
 
         assert _condition_json(condition).endswith('"radius":5000.0}}')
         assert (
@@ -231,7 +283,9 @@ async def test_request_carries_the_condition_verbatim(stub_server) -> None:
         "GET", "/rest/data/Product/find", {"success": True, "data": [], "total": 0}
     )
     client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
-    find_filter = KonectyFilter().add_within_radius(TERM, CENTER, RADIUS_METERS)
+    find_filter = KonectyFilter().add_within_radius(
+        TERM, lat=LAT, lng=LNG, radius=RADIUS_METERS
+    )
 
     await client.find("Product", KonectyFindParams(filter=find_filter))
 
@@ -267,7 +321,9 @@ async def test_request_carries_a_center_by_reference_verbatim(stub_server) -> No
         "GET", "/rest/data/Product/find", {"success": True, "data": [], "total": 0}
     )
     client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
-    find_filter = KonectyFilter().add_within_radius(TERM, CENTER_REF, RADIUS_METERS)
+    find_filter = KonectyFilter().add_within_radius(
+        TERM, record=CENTER_REF, radius=RADIUS_METERS
+    )
 
     await client.find("Product", KonectyFindParams(filter=find_filter))
 
@@ -308,7 +364,9 @@ class TestWithinRadiusErrorCodes:
             status=400,
         )
         client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
-        find_filter = KonectyFilter().add_within_radius(TERM, CENTER, -1)
+        find_filter = KonectyFilter().add_within_radius(
+            TERM, lat=LAT, lng=LNG, radius=-1
+        )
 
         with pytest.raises(KonectyWithinRadiusValueError) as excinfo:
             await client.find("Product", KonectyFindParams(filter=find_filter))
@@ -334,7 +392,9 @@ class TestWithinRadiusErrorCodes:
             status=400,
         )
         client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
-        find_filter = KonectyFilter().add_within_radius(TERM, CENTER_REF, RADIUS_METERS)
+        find_filter = KonectyFilter().add_within_radius(
+            TERM, record=CENTER_REF, radius=RADIUS_METERS
+        )
 
         with pytest.raises(KonectyWithinRadiusCenterError) as excinfo:
             await client.find("Product", KonectyFindParams(filter=find_filter))
@@ -371,7 +431,9 @@ class TestWithinRadiusErrorCodes:
             status=400,
         )
         client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
-        find_filter = KonectyFilter().add_within_radius(TERM, CENTER_REF, RADIUS_METERS)
+        find_filter = KonectyFilter().add_within_radius(
+            TERM, record=CENTER_REF, radius=RADIUS_METERS
+        )
 
         with pytest.raises(KonectyWithinRadiusCenterError) as excinfo:
             await client.find("Product", KonectyFindParams(filter=find_filter))
@@ -396,7 +458,9 @@ class TestWithinRadiusErrorCodes:
             status=400,
         )
         client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
-        find_filter = KonectyFilter().add_within_radius(TERM, CENTER, -1)
+        find_filter = KonectyFilter().add_within_radius(
+            TERM, lat=LAT, lng=LNG, radius=-1
+        )
 
         with pytest.raises(KonectyAPIError):
             await client.find("Product", KonectyFindParams(filter=find_filter))
@@ -419,7 +483,9 @@ class TestWithinRadiusErrorCodes:
             status=400,
         )
         client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
-        find_filter = KonectyFilter().add_within_radius(TERM, CENTER, RADIUS_METERS)
+        find_filter = KonectyFilter().add_within_radius(
+            TERM, lat=LAT, lng=LNG, radius=RADIUS_METERS
+        )
 
         with pytest.raises(KonectyWithinRadiusValueError) as excinfo:
             await client.find("Product", KonectyFindParams(filter=find_filter))
@@ -435,7 +501,9 @@ class TestWithinRadiusErrorCodes:
             status=400,
         )
         client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
-        find_filter = KonectyFilter().add_within_radius(TERM, CENTER, RADIUS_METERS)
+        find_filter = KonectyFilter().add_within_radius(
+            TERM, lat=LAT, lng=LNG, radius=RADIUS_METERS
+        )
 
         with pytest.raises(KonectyAPIError) as excinfo:
             await client.find("Product", KonectyFindParams(filter=find_filter))
@@ -520,3 +588,216 @@ class TestDepthAndQuotaCodes:
             )
 
         assert not isinstance(excinfo.value, KonectyWithinRadiusCenterError)
+
+
+def _geo_params(**kwargs) -> KonectyFindParams:
+    return KonectyFindParams(
+        filter=KonectyFilter().add_within_radius(
+            TERM, lat=LAT, lng=LNG, radius=RADIUS_METERS
+        ),
+        **kwargs,
+    )
+
+
+def _distance_sort(direction: SortDirection = SortDirection.ASC):
+    return [SortOrder(property=DISTANCE_FIELD, direction=direction)]
+
+
+class TestDistanceAndSort:
+    """
+    Distância e ordenação por distância (Revisão 2: GEO-13, GEO-14, GEO-15, GEO-17).
+
+    Paridade com ``src/__test__/api/withinRadius.test.ts`` no SDK TypeScript, describe
+    ``within_radius: _distance e ordenação por distância`` — MESMA entrada, MESMA saída.
+    """
+
+    def test_distance_field_is_the_name_the_server_returns_and_sorts_by(self) -> None:
+        assert DISTANCE_FIELD == "_distance"
+        assert DISTANCE_SORT_UNAVAILABLE == "DISTANCE_SORT_UNAVAILABLE"
+
+    @pytest.mark.asyncio
+    async def test_find_with_geo_filter_and_distance_sort_sends_both_verbatim(
+        self, stub_server
+    ) -> None:
+        """``filter`` e ``sort`` chegam com o MESMO conteúdo que o SDK TS envia.
+
+        A query string crua não é igual byte a byte à do TS por diferenças
+        pré-existentes e neutras (``json.dumps`` com espaço, ``yarl`` sem
+        percent-encoding de ``:``/``,``; ver o topo deste arquivo). O que se trava é o
+        valor decodificado, compactado, contra os MESMOS literais do TS, e que o
+        ``sort`` passa sem transformação.
+        """
+        stub_server.route(
+            "GET", "/rest/data/Product/find", {"success": True, "data": [], "total": 0}
+        )
+        client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
+
+        await client.find("Product", _geo_params(sort=_distance_sort()))
+
+        query = stub_server.requests[-1]["query"]
+        sent_filter = json.loads(query["filter"])
+        condition = sent_filter["conditions"][0]
+        condition.pop("disabled", None)
+        assert json.dumps(condition, separators=(",", ":")) == EXPECTED_CONDITION_JSON
+        assert (
+            json.dumps(json.loads(query["sort"]), separators=(",", ":"))
+            == EXPECTED_DISTANCE_SORT_JSON
+        )
+
+        raw_path = stub_server.requests[-1]["raw_path"]
+        raw_sort = raw_path.split("sort=", 1)[1].split("&", 1)[0]
+        assert unquote_plus(raw_sort) == query["sort"]
+        assert "{" not in raw_path and '"' not in raw_path and " " not in raw_path
+
+    @pytest.mark.asyncio
+    async def test_distance_sort_desc_is_sent_verbatim(self, stub_server) -> None:
+        """Paridade com 'Module.find aceita sort por _distance…' no SDK TS (DESC)."""
+        stub_server.route(
+            "GET", "/rest/data/Product/find", {"success": True, "data": [], "total": 0}
+        )
+        client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
+
+        await client.find(
+            "Product", _geo_params(sort=_distance_sort(SortDirection.DESC))
+        )
+
+        sent_sort = json.loads(stub_server.requests[-1]["query"]["sort"])
+        assert (
+            json.dumps(sent_sort, separators=(",", ":"))
+            == '[{"property":"_distance","direction":"DESC"}]'
+        )
+
+    @pytest.mark.asyncio
+    async def test_each_record_distance_reaches_the_caller(self, stub_server) -> None:
+        stub_server.route(
+            "GET",
+            "/rest/data/Product/find",
+            {
+                "success": True,
+                "data": [
+                    {"_id": "p-1", "_distance": 850},
+                    {"_id": "p-2", "_distance": 4999},
+                ],
+                "total": 2,
+            },
+        )
+        client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
+
+        records = await client.find("Product", _geo_params(sort=_distance_sort()))
+
+        assert [record[DISTANCE_FIELD] for record in records] == [850, 4999]
+
+    def test_distance_sort_unavailable_maps_with_code_and_message_no_center(
+        self,
+    ) -> None:
+        with pytest.raises(KonectyDistanceSortUnavailableError) as excinfo:
+            raise_for_konecty_errors(
+                [
+                    {
+                        "message": DISTANCE_SORT_NO_CENTER_MESSAGE,
+                        "code": DISTANCE_SORT_UNAVAILABLE,
+                    }
+                ]
+            )
+
+        assert excinfo.value.code == "DISTANCE_SORT_UNAVAILABLE"
+        assert str(excinfo.value) == DISTANCE_SORT_NO_CENTER_MESSAGE
+
+    def test_distance_sort_unavailable_other_message_arrives_intact(self) -> None:
+        with pytest.raises(KonectyDistanceSortUnavailableError) as excinfo:
+            raise_for_konecty_errors(
+                [
+                    {
+                        "message": DISTANCE_SORT_NO_ACCESS_MESSAGE,
+                        "code": DISTANCE_SORT_UNAVAILABLE,
+                    }
+                ]
+            )
+
+        assert str(excinfo.value) == DISTANCE_SORT_NO_ACCESS_MESSAGE
+
+    def test_distance_sort_unavailable_without_message_uses_the_ts_default(
+        self,
+    ) -> None:
+        with pytest.raises(KonectyDistanceSortUnavailableError) as excinfo:
+            raise_for_konecty_errors([{"code": DISTANCE_SORT_UNAVAILABLE}])
+
+        assert (
+            str(excinfo.value) == "Sorting by _distance is not available for this query"
+        )
+
+    def test_distance_sort_unavailable_is_neither_filter_nor_page_cap_refusal(
+        self,
+    ) -> None:
+        with pytest.raises(KonectyDistanceSortUnavailableError) as excinfo:
+            raise_for_konecty_errors(
+                [
+                    {
+                        "message": DISTANCE_SORT_NO_CENTER_MESSAGE,
+                        "code": DISTANCE_SORT_UNAVAILABLE,
+                    }
+                ]
+            )
+
+        assert not isinstance(excinfo.value, KonectyWithinRadiusValueError)
+        assert not isinstance(excinfo.value, KonectySortLimitError)
+        assert isinstance(excinfo.value, KonectyAPIError)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [400, 200],
+        ids=["http-400", "http-200-before-geo-17"],
+    )
+    async def test_distance_sort_unavailable_raises_typed_on_find(
+        self, stub_server, status: int
+    ) -> None:
+        """Paridade com os dois testes de ``Module.find`` (400 e 200) no SDK TS."""
+        stub_server.route(
+            "GET",
+            "/rest/data/Product/find",
+            {
+                "success": False,
+                "errors": [
+                    {
+                        "message": DISTANCE_SORT_NO_CENTER_MESSAGE,
+                        "code": DISTANCE_SORT_UNAVAILABLE,
+                    }
+                ],
+            },
+            status=status,
+        )
+        client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
+
+        with pytest.raises(KonectyDistanceSortUnavailableError) as excinfo:
+            await client.find(
+                "Product",
+                KonectyFindParams(filter=KonectyFilter(), sort=_distance_sort()),
+            )
+
+        assert excinfo.value.code == DISTANCE_SORT_UNAVAILABLE
+        assert str(excinfo.value) == DISTANCE_SORT_NO_CENTER_MESSAGE
+
+    @pytest.mark.asyncio
+    async def test_invalid_value_in_http_200_is_typed_too(self, stub_server) -> None:
+        """Até o GEO-17 estas recusas vinham em 200; o 400 está coberto acima."""
+        stub_server.route(
+            "GET",
+            "/rest/data/Product/find",
+            {
+                "success": False,
+                "errors": [
+                    {
+                        "message": INVALID_VALUE_MESSAGE,
+                        "code": WITHIN_RADIUS_INVALID_VALUE,
+                    }
+                ],
+            },
+            status=200,
+        )
+        client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
+
+        with pytest.raises(KonectyWithinRadiusValueError) as excinfo:
+            await client.find("Product", _geo_params())
+
+        assert str(excinfo.value) == INVALID_VALUE_MESSAGE
