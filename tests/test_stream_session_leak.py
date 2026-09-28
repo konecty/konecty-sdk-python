@@ -12,10 +12,11 @@ Não há paridade com o SDK TypeScript: lá o `findStream` usa `fetch`, que não
 tem sessão para fechar.
 """
 
-from typing import Any, Dict, List
+from typing import Any, List
 
 import aiohttp
 import pytest
+from aiohttp import web
 
 from KonectySdkPython.lib import http
 from KonectySdkPython.lib.client import KonectyClient
@@ -42,19 +43,20 @@ def _still_open(sessions: List[aiohttp.ClientSession]) -> List[aiohttp.ClientSes
     return [session for session in sessions if not session.closed]
 
 
+def _assert_single_session_closed(sessions: List[aiohttp.ClientSession]) -> None:
+    assert len(sessions) == 1
+    assert _still_open(sessions) == []
+
+
 @pytest.mark.asyncio
 async def test_stream_request_closes_session_on_http_error(stub_server, opened_sessions) -> None:
     stub_server.route("GET", "/rest/stream/Product/findStream", {"success": False}, status=400)
-
-    class _Client:
-        base_url = stub_server.base_url
-        headers: Dict[str, str] = {}
+    client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
 
     with pytest.raises(aiohttp.ClientResponseError):
-        await request(_Client(), "GET", "/rest/stream/Product/findStream", stream=True)
+        await request(client, "GET", "/rest/stream/Product/findStream", stream=True)
 
-    assert len(opened_sessions) == 1
-    assert _still_open(opened_sessions) == []
+    _assert_single_session_closed(opened_sessions)
 
 
 @pytest.mark.asyncio
@@ -65,19 +67,40 @@ async def test_find_stream_closes_session_on_http_error(stub_server, opened_sess
     with pytest.raises(aiohttp.ClientResponseError):
         await client.find_stream("Product", KonectyFindParams(filter=KonectyFilter()))
 
-    assert len(opened_sessions) == 1
-    assert _still_open(opened_sessions) == []
+    _assert_single_session_closed(opened_sessions)
 
 
 @pytest.mark.asyncio
 async def test_stream_request_closes_session_on_connection_error(opened_sessions) -> None:
-    class _Client:
-        # Porta 1 recusa conexão: o `session.request` falha antes de haver resposta.
-        base_url = "http://127.0.0.1:1"
-        headers: Dict[str, str] = {}
+    # Porta 1 recusa conexão: o `session.request` falha antes de haver resposta.
+    client = KonectyClient(base_url="http://127.0.0.1:1", token="fake-token")
 
     with pytest.raises(aiohttp.ClientConnectionError):
-        await request(_Client(), "GET", "/rest/stream/Product/findStream", stream=True)
+        await request(client, "GET", "/rest/stream/Product/findStream", stream=True)
+
+    _assert_single_session_closed(opened_sessions)
+
+
+@pytest.mark.asyncio
+async def test_find_stream_keeps_session_open_until_stream_is_consumed(
+    stub_server, opened_sessions
+) -> None:
+    # No caminho feliz o `StreamResponse` é o dono da sessão: fechá-la antes (num `finally`, por
+    # exemplo) cortaria o stream antes de quem chamou ler o corpo.
+    ndjson = b'{"_id": "1", "code": 1}\n{"_id": "2", "code": 2}\n'
+    stub_server.route(
+        "GET",
+        "/rest/stream/Product/findStream",
+        web.Response(body=ndjson, content_type="application/x-ndjson"),
+    )
+    client = KonectyClient(base_url=stub_server.base_url, token="fake-token")
+
+    result = await client.find_stream("Product", KonectyFindParams(filter=KonectyFilter()))
 
     assert len(opened_sessions) == 1
+    assert _still_open(opened_sessions) == opened_sessions
+
+    records = [record async for record in result.stream]
+
+    assert records == [{"_id": "1", "code": 1}, {"_id": "2", "code": 2}]
     assert _still_open(opened_sessions) == []
