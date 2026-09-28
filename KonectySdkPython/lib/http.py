@@ -74,8 +74,13 @@ async def request(
 
     if stream:
         session = aiohttp.ClientSession()
-        response = await session.request(method, url, **kwargs)
-        response.raise_for_status()
+        # Until StreamResponse owns the session, a failure here must close it or it leaks.
+        try:
+            response = await session.request(method, url, **kwargs)
+            response.raise_for_status()
+        except BaseException:
+            await session.close()
+            raise
         return StreamResponse(session, response)
 
     async with aiohttp.ClientSession() as session:
