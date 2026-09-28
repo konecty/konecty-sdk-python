@@ -108,22 +108,24 @@ EXPECTED_CENTER_REF_CONDITION_JSON = (
 EXPECTED_DISTANCE_SORT_JSON = '[{"property":"_distance","direction":"ASC"}]'
 
 #: Mensagem de recusa de faixa no formato da Revisão 2 (nomeia a chave e a faixa,
-#: GEO-12.5). O servidor é alterado em paralelo; o SDK repassa o texto sem
-#: interpretá-lo, então o literal serve de amostra — o que este arquivo trava é o
-#: ``code`` e a mensagem chegar INTEIRA. MESMO literal do SDK TypeScript.
+#: GEO-12.5). Texto real do servidor, byte a byte (Konecty
+#: ``src/imports/data/filters/withinRadius.ts``); o SDK repassa o texto sem
+#: interpretá-lo — o que este arquivo trava é o ``code`` e a mensagem chegar
+#: INTEIRA. MESMO literal do SDK TypeScript.
 INVALID_VALUE_MESSAGE = (
     'Invalid value for operator within_radius on term "address": '
-    "lat must be a finite number between -90 and 90"
+    "lat must be between -90 and 90"
 )
 
 #: As duas recusas de ``DISTANCE_SORT_UNAVAILABLE`` (GEO-14.3 e GEO-15.3): mesmo
-#: código, mensagens distintas. MESMOS literais do SDK TypeScript.
+#: código, mensagens distintas. Textos reais do servidor, byte a byte (Konecty
+#: ``src/imports/data/filters/distance.ts``). MESMOS literais do SDK TypeScript.
 DISTANCE_SORT_NO_CENTER_MESSAGE = (
     "Sorting by _distance requires exactly one within_radius condition "
-    "on the AND path of the filter"
+    "on the AND path of the filter."
 )
 DISTANCE_SORT_NO_ACCESS_MESSAGE = (
-    "Sorting by _distance requires read access to field address"
+    'Sorting by _distance requires unconditional read access to field "address".'
 )
 
 #: Id de correlação de exemplo, no formato que o servidor emite: doze caracteres
