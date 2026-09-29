@@ -62,6 +62,19 @@ Ordenar por `_id` — ascendente **ou** descendente — é sempre aceito, em qua
 volume, e é o caminho recomendado para leitura em volume. `sort` vazio significa
 "sem ordenação" e não é recusado.
 
+### Erros com corpo chegam legíveis em todos os caminhos de leitura
+
+Vale para **qualquer** 400 com envelope `{success: false, errors: [...]}`, não só
+para a recusa de sort: `find`, `find_sync`, `lookup`, `find_by_id` e
+`count_documents` leem o corpo **antes** de olhar o status, então a mensagem e o
+`code` do servidor chegam ao chamador como `KonectyAPIError` (ou a subclasse
+específica). Antes, `lookup`, `find_by_id` e `count_documents` levantavam
+`aiohttp.ClientResponseError` cru — sem mensagem, sem código e sem a saída que a
+mensagem indica.
+
+Quando a resposta não traz JSON de objeto (proxy devolvendo HTML, string ou
+lista), o SDK cai no tratamento por status, preservando o comportamento antigo.
+
 Equivalente TypeScript: `KonectySortLimitError` exportado de `@konecty/sdk/Client`.
 
 ## Parâmetros do find (GET /rest/data/{module}/find)
