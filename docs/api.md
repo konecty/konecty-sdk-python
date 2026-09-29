@@ -77,6 +77,127 @@ lista), o SDK cai no tratamento por status, preservando o comportamento antigo.
 
 Equivalente TypeScript: `KonectySortLimitError` exportado de `@konecty/sdk/Client`.
 
+## Filtro de busca por raio geográfico (`within_radius`)
+
+Filtra registros cujo campo `address` esteja dentro de um raio, em **metros**, a
+partir de um centro. O `term` é o campo `address` puro — o sufixo `.geolocation`
+é acrescentado pelo servidor, não pelo cliente.
+
+```python
+from KonectySdkPython.lib.filters import KonectyFilter, KonectyFindParams
+
+# Porto Alegre, 5 km. As coordenadas vão NOMEADAS: não há ordem a errar.
+find_filter = KonectyFilter().add_within_radius(
+    "address", lat=-30.0346, lng=-51.2177, radius=5000
+)
+
+await client.find("Product", KonectyFindParams(filter=find_filter))
+```
+
+`within_radius_condition("address", lat=-30.0346, lng=-51.2177, radius=5000)`
+monta a mesma condição avulsa, para compor à mão. O valor enviado é
+`{"lat": -30.0346, "lng": -51.2177, "radius": 5000}`.
+
+`lat` vai de -90 a 90 e `lng` de -180 a 180, ambos números finitos. A forma
+antiga `add_within_radius("address", (lng, lat), radius)` **deixou de existir**:
+os parâmetros depois de `term` são só nomeados (a chamada posicional levanta
+`TypeError`), e o servidor recusa a chave `center` com
+`WITHIN_RADIUS_INVALID_VALUE`.
+
+O centro também pode vir de outro registro — "perto do empreendimento X" — sem
+uma ida e volta para descobrir as coordenadas antes:
+
+```python
+KonectyFilter().add_within_radius(
+    "address",
+    record={"document": "Development", "_id": "<id>", "field": "address"},
+    radius=2000,
+)
+```
+
+O servidor lê o registro-centro sob controle de acesso completo. `field` é
+obrigatório porque um documento pode ter mais de um campo `address`. As duas
+formas — `lat`/`lng` e `record` — são mutuamente exclusivas.
+
+### Distância (`_distance`) e ordenação por distância
+
+Quando o filtro tem **exatamente um** `within_radius` habilitado no caminho AND
+(fora de qualquer nó `or`), cada registro devolvido por `find` traz
+`_distance`: a distância até o centro em **metros**, inteira. Com zero ou duas+
+condições nessa posição, ou quando o usuário não pode ler o campo `address`, o
+campo simplesmente não vem — não é erro. `_distance` é calculado, nunca gravado:
+não o devolva num `update`.
+
+```python
+from KonectySdkPython.lib.filters import DISTANCE_FIELD, SortDirection, SortOrder
+
+records = await client.find(
+    "Product",
+    KonectyFindParams(
+        filter=find_filter,
+        sort=[SortOrder(property=DISTANCE_FIELD, direction=SortDirection.ASC)],
+    ),
+)
+records[0][DISTANCE_FIELD]  # 850
+```
+
+`DISTANCE_FIELD` é `"_distance"`. O `sort` vai ao servidor sem transformação; o
+empate é resolvido pelo servidor por `_id`. Ordenar por distância segue o teto
+de página de qualquer ordenação arbitrária (`SORT_ABOVE_MAX_PAGE_SIZE`).
+
+### Códigos de erro
+
+Chegam como exceção própria, com a mensagem do servidor preservada (todas
+subclasses de `KonectyAPIError`) — em HTTP 400 e também em 200 com
+`success: false` (servidores anteriores à mudança para 400):
+
+| Código | Exceção | Quando |
+| --- | --- | --- |
+| `WITHIN_RADIUS_INVALID_VALUE` | `KonectyWithinRadiusValueError` | forma ou faixa do valor recusada (chave ausente ou desconhecida, `lat`/`lng` e `record` juntos, coordenada fora de faixa, string numérica, raio ≤ 0 ou acima do teto) |
+| `WITHIN_RADIUS_CENTER_UNRESOLVED` | `KonectyWithinRadiusCenterError` | o registro-centro não existe, não é legível, ou não tem geolocalização |
+| `DISTANCE_SORT_UNAVAILABLE` | `KonectyDistanceSortUnavailableError` | `sort` por `_distance` sem exatamente um `within_radius` no caminho AND, ou sem leitura (plena) do campo `address` |
+
+O SDK **não** valida faixa nem teto de raio: quem decide é o servidor, e um
+limite copiado aqui passaria a mentir assim que o backend mudasse. Em particular
+string numérica **não** é coagida para número — o servidor a recusa de propósito.
+
+### `WITHIN_RADIUS_CENTER_UNRESOLVED`: o id de correlação é o caminho de suporte
+
+Três causas produzem esse código — o registro-centro **não existe**, existe mas
+**não é legível** para o usuário da requisição, ou é legível mas **não tem
+geolocalização** gravada. A resposta não diz qual: distinguí-las transformaria o
+filtro num oráculo, e quem não pode ler o registro descobriria se ele existe e
+onde fica variando o raio até a resposta mudar.
+
+A causa real fica no **log do servidor**, e a mensagem devolvida termina com o id
+que aponta para a linha correspondente:
+
+```
+Could not resolve the center record for operator within_radius on term "address". Correlation id: 7b3f2a9c41d8
+```
+
+O id tem doze caracteres hexadecimais, ou 32 quando há tracing ativo (aí ele **é**
+o `traceId` do span, e serve direto como chave de busca no log). O SDK entrega a
+mensagem **inteira** em `str(exc)` — não a trunca nem a reescreve. Ao reportar o
+problema, **mande o id**: sem ele não há como achar a linha, e o suporte terá de
+pedir data, hora aproximada e namespace.
+
+Nem toda mensagem com esse código traz um id. O mesmo código recusa também um
+centro por referência que chega por um caminho que **não hidrata** — `update` e
+`findById`, contra `find`, stream/export e lookup, que hidratam — e essa recusa
+tem texto próprio, sem id:
+
+```
+Could not resolve the center record for operator within_radius on term "address". A center by record reference is resolved only on read paths (find, stream/export and lookup) and is not supported here.
+```
+
+Ou seja: ramifique pelo `.code`, e **mostre a mensagem** ao usuário em vez de
+casar com o texto dela.
+
+Equivalente TypeScript: `withinRadiusCondition`, `DISTANCE_FIELD` e os códigos
+exportados de `@konecty/sdk/Client`; exceções `KonectyWithinRadiusValueError`,
+`KonectyWithinRadiusCenterError` e `KonectyDistanceSortUnavailableError`.
+
 ## Parâmetros do find (GET /rest/data/{module}/find)
 
 Os parâmetros são enviados como query string. O SDK monta esses parâmetros a partir de `KonectyFindParams` e `KonectyFilter` (módulo filters).
