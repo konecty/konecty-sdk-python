@@ -52,6 +52,25 @@ KONECTY_UPDATE_IGNORE_FIELDS = [
 KONECTY_CREATE_IGNORE_FIELDS = ["_updatedAt", "_createdAt", "_updatedBy", "_createdBy"]
 
 
+def _find_query_params(options: KonectyFindParams, get_total: bool) -> Dict[str, str]:
+    """Query string de /rest/data/{module}/find.
+
+    `getTotal=false` só vai para a rede quando a contagem é desligada: com o
+    padrão a query fica idêntica à de antes. Paridade com `KonectyClient.find` do
+    SDK TypeScript, que também só envia o desligamento, sempre no fim da query.
+    """
+    params: Dict[str, str] = {}
+    for key, value in options.model_dump(exclude_none=True).items():
+        params[key] = (
+            json.dumps(value, default=json_serial)
+            if key != "fields"
+            else ",".join(value)
+        )
+    if get_total is False:
+        params["getTotal"] = "false"
+    return params
+
+
 def get_first_dict(items: List[Any]) -> Optional[KonectyDict]:
     """Retorna o primeiro item de uma lista como dicionário ou None se estiver vazia."""
     if not items:
@@ -655,14 +674,16 @@ class KonectyClient:
             query_id, shared_with, is_public=is_public
         )
 
-    async def find(self, module: str, options: KonectyFindParams) -> List[KonectyDict]:
-        params: Dict[str, str] = {}
-        for key, value in options.model_dump(exclude_none=True).items():
-            params[key] = (
-                json.dumps(value, default=json_serial)
-                if key != "fields"
-                else ",".join(value)
-            )
+    async def find(
+        self, module: str, options: KonectyFindParams, get_total: bool = True
+    ) -> List[KonectyDict]:
+        """Busca registros em GET /rest/data/{module}/find.
+
+        `get_total=False` pede ao servidor para não contar o total (a resposta vem
+        sem `total`), o que acelera listagens grandes quando o total não é
+        necessário. Com o padrão (`True`) nada é enviado e a URL é a mesma de antes.
+        """
+        params = _find_query_params(options, get_total)
 
         async with (
             aiohttp.ClientSession() as session,
@@ -716,15 +737,11 @@ class KonectyClient:
             data = result.get("data", [])
             return cast(List[KonectyDict], data)
 
-    def find_sync(self, module: str, options: KonectyFindParams) -> List[KonectyDict]:
-        """Versão síncrona de find."""
-        params: Dict[str, str] = {}
-        for key, value in options.model_dump(exclude_none=True).items():
-            params[key] = (
-                json.dumps(value, default=json_serial)
-                if key != "fields"
-                else ",".join(value)
-            )
+    def find_sync(
+        self, module: str, options: KonectyFindParams, get_total: bool = True
+    ) -> List[KonectyDict]:
+        """Versão síncrona de find (mesma semântica de `get_total`)."""
+        params = _find_query_params(options, get_total)
 
         import requests
 

@@ -30,8 +30,8 @@ From **KonectySdkPython.lib.types** only: KonectyUpdateId (for update/delete ids
 
 | Method                         | Async | Args                                                          | Returns                              |
 | ------------------------------ | ----- | ------------------------------------------------------------- | ------------------------------------ |
-| find                           | yes   | module, KonectyFindParams                                     | List[KonectyDict]                    |
-| find_sync                      | no    | module, KonectyFindParams                                     | List[KonectyDict]                    |
+| find                           | yes   | module, KonectyFindParams, get_total=True                     | List[KonectyDict]                    |
+| find_sync                      | no    | module, KonectyFindParams, get_total=True                     | List[KonectyDict]                    |
 | find_one                       | yes   | module, KonectyFilter                                         | Optional[KonectyDict]                |
 | find_one_sync                  | no    | module, KonectyFilter                                         | Optional[KonectyDict]                |
 | find_by_id                     | yes   | module, id                                                    | Optional[KonectyDict]                |

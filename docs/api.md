@@ -76,6 +76,28 @@ Os parâmetros são enviados como query string. O SDK monta esses parâmetros a 
 
 A API do Konecty aceita ainda parâmetros opcionais como `displayName`, `displayType` e `withDetailFields`; o SDK atual não os expõe diretamente nos métodos de find.
 
+### Busca sem contagem total (`get_total=False`)
+
+Por padrão o Konecty conta quantos registros batem com o filtro e devolve o
+número em `total`. Em coleções grandes essa contagem é a parte cara da busca.
+Quando o total não é necessário — paginação "carregar mais", rolagem infinita,
+"pegue os próximos N" — passe `get_total=False` para `find` ou `find_sync`: o SDK
+acrescenta `getTotal=false` à query, o servidor não conta e a resposta vem sem
+`total`.
+
+```python
+params = KonectyFindParams(filter=f, start=100, limit=50)
+data = await client.find("Contact", params, get_total=False)
+```
+
+Só o desligamento vai para a rede: com o padrão (`get_total=True`) nada é
+enviado e a URL é a mesma de antes. `find`/`find_sync` devolvem apenas a lista de
+registros, então o retorno não muda; `count_documents`, que depende do `total`,
+continua sempre pedindo a contagem.
+
+Equivalente TypeScript: `getTotal: false` em `KonectyClient.find` e
+`KonectyModule.find` (`@konecty/sdk`).
+
 ## Parâmetros do lookup (GET /rest/data/{module}/lookup/{lookup_field})
 
 O método assíncrono `lookup` usa a mesma estrutura de parâmetros de `KonectyFindParams` (filter, start, limit, sort e fields), com serialização idêntica ao find:
