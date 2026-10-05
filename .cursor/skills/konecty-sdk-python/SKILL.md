@@ -73,6 +73,7 @@ All async methods use aiohttp; sync find uses requests. On API failure the clien
 ## Building find options
 
 - **Filter:** `KonectyFilter.create(match="and"|"or")` then `.add_condition(term, operator, value)` and optionally `.add_filter(match)` for nested filters. Operator values: equals, not_equals, in, not_in, less_than, greater_than, less_or_equals, greater_or_equals, between, exists, contains, starts_with, end_with, not_contains (use `FilterOperator` enum or lowercase strings).
+- **Geo radius (`within_radius`):** `KonectyFilter.create().add_within_radius("address", lat=-30.0346, lng=-51.2177, radius=5000)` or `record={"document": "Development", "_id": "<id>", "field": "address"}` instead of `lat`/`lng` — all keyword-only, radius in **meters**, `term` is the bare `address` field (the server appends `.geolocation`). Standalone: `within_radius_condition(term, *, lat, lng, record, radius)` from `KonectySdkPython.lib.filters`. The old `(lng, lat)` tuple form no longer exists. With exactly one `within_radius` on the AND path, each returned record carries `_distance` (integer meters; `DISTANCE_FIELD`), and `SortOrder(property=DISTANCE_FIELD, direction=SortDirection.ASC)` sorts by it.
 - **Sort:** `KonectyFindParams(..., sort=[SortOrder(property="fieldName", direction=SortDirection.DESC)], ...)`.
 - **Pagination:** `start` and `limit` on `KonectyFindParams`. **Fields:** `fields` as list of field names (e.g. `["_id", "name"]`).
 
@@ -106,6 +107,7 @@ The client uses the Konecty REST endpoints documented in `docs/api.md`, includin
 - **Authorization:** Send the token as-is in the Authorization header; the SDK does not add "Bearer". Configure the same token Konecty expects (e.g. from login or API key).
 - **Update/delete:** Always pass the current `_updatedAt` of the record; Konecty uses it for optimistic concurrency. After a find, use the same record’s \_updatedAt for update_one or delete_one.
 - **Module name:** The `module` parameter is the Konecty document name (e.g. Contact, User, Setting), not a URL path. Get document names from the app or from get_document/get_schema.
+- **within_radius / distance sort refusals:** the server answers HTTP 400 with a code, raised as `KonectyWithinRadiusValueError` (`WITHIN_RADIUS_INVALID_VALUE`), `KonectyWithinRadiusCenterError` (`WITHIN_RADIUS_CENTER_UNRESOLVED`) and its subclass `KonectyWithinRadiusCenterDepthError` (`WITHIN_RADIUS_CENTER_DEPTH_EXCEEDED`), `KonectyWithinRadiusTooManyCentersError` (`WITHIN_RADIUS_TOO_MANY_CENTERS`), `KonectyDistanceSortUnavailableError` (`DISTANCE_SORT_UNAVAILABLE`) — all in `KonectySdkPython.lib.exceptions`, subclasses of `KonectyAPIError`, with `.code`. The SDK does not validate ranges or caps; the server does.
 - **Filter serialization:** Datetimes in filters must be serializable to Konecty format; the client uses a json_serial that emits `$date` for datetime. Use KonectyFilter/KonectyFindParams so the SDK serializes correctly.
 
 ## Additional resources
