@@ -191,12 +191,21 @@ async def apply_document(
 
     # Hooks
     for file_path in doc_files["hook"]:
-        data = file_path.read_text()
+        data: Any = file_path.read_text()
         if data:
+            hook_name = file_path.stem
+            # `validationData.json` é objeto no core, não texto: gravado como string, o
+            # `Object.keys` do `processValidationScript` itera os caracteres. Comparar o
+            # objeto também faz o apply reparar o que a versão antiga gravou como string.
+            if file_path.suffix == ".json":
+                try:
+                    data = json.loads(data)
+                except json.JSONDecodeError as error:
+                    errors.append(f"✗ {doc_name}/{hook_name}: JSON inválido ({error})")
+                    continue
             existing_data = collection.find_one(
                 {"name": doc_name, "type": {"$in": ["composite", "document"]}}
             )
-            hook_name = file_path.stem
             if existing_data:
                 if existing_data.get(hook_name, None) == data:
                     skipped.append(f"⚡ {doc_name}/{hook_name} [identical]")

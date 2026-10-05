@@ -62,6 +62,19 @@ Ordenar por `_id` — ascendente **ou** descendente — é sempre aceito, em qua
 volume, e é o caminho recomendado para leitura em volume. `sort` vazio significa
 "sem ordenação" e não é recusado.
 
+### Erros com corpo chegam legíveis em todos os caminhos de leitura
+
+Vale para **qualquer** 400 com envelope `{success: false, errors: [...]}`, não só
+para a recusa de sort: `find`, `find_sync`, `lookup`, `find_by_id` e
+`count_documents` leem o corpo **antes** de olhar o status, então a mensagem e o
+`code` do servidor chegam ao chamador como `KonectyAPIError` (ou a subclasse
+específica). Antes, `lookup`, `find_by_id` e `count_documents` levantavam
+`aiohttp.ClientResponseError` cru — sem mensagem, sem código e sem a saída que a
+mensagem indica.
+
+Quando a resposta não traz JSON de objeto (proxy devolvendo HTML, string ou
+lista), o SDK cai no tratamento por status, preservando o comportamento antigo.
+
 Equivalente TypeScript: `KonectySortLimitError` exportado de `@konecty/sdk/Client`.
 
 ## Filtro de busca por raio geográfico (`within_radius`)
@@ -196,6 +209,28 @@ Os parâmetros são enviados como query string. O SDK monta esses parâmetros a 
 - **fields:** lista de nomes de campos a retornar; no SDK é enviada como string separada por vírgula.
 
 A API do Konecty aceita ainda parâmetros opcionais como `displayName`, `displayType` e `withDetailFields`; o SDK atual não os expõe diretamente nos métodos de find.
+
+### Busca sem contagem total (`get_total=False`)
+
+Por padrão o Konecty conta quantos registros batem com o filtro e devolve o
+número em `total`. Em coleções grandes essa contagem é a parte cara da busca.
+Quando o total não é necessário — paginação "carregar mais", rolagem infinita,
+"pegue os próximos N" — passe `get_total=False` para `find` ou `find_sync`: o SDK
+acrescenta `getTotal=false` à query, o servidor não conta e a resposta vem sem
+`total`.
+
+```python
+params = KonectyFindParams(filter=f, start=100, limit=50)
+data = await client.find("Contact", params, get_total=False)
+```
+
+Só o desligamento vai para a rede: com o padrão (`get_total=True`) nada é
+enviado e a URL é a mesma de antes. `find`/`find_sync` devolvem apenas a lista de
+registros, então o retorno não muda; `count_documents`, que depende do `total`,
+continua sempre pedindo a contagem.
+
+Equivalente TypeScript: `getTotal: false` em `KonectyClient.find` e
+`KonectyModule.find` (`@konecty/sdk`).
 
 ## Parâmetros do lookup (GET /rest/data/{module}/lookup/{lookup_field})
 

@@ -41,8 +41,8 @@ From `KonectySdkPython.lib` the same symbols are available; from `KonectySdkPyth
 ## KonectyClient usage
 
 - **Constructor:** `KonectyClient(base_url: str, token: str)`. Use env or config for base_url and token.
-- **Find (async):** `find(module: str, options: KonectyFindParams) -> List[KonectyDict]`. Use `KonectyFindParams(filter=..., start=..., limit=..., sort=..., fields=...)`.
-- **Find (sync):** `find_sync(module, options)` — same contract, blocking.
+- **Find (async):** `find(module: str, options: KonectyFindParams, get_total: bool = True) -> List[KonectyDict]`. Use `KonectyFindParams(filter=..., start=..., limit=..., sort=..., fields=...)`. `get_total=False` sends `getTotal=false` so the server skips counting the total — faster for large listings when the total is not needed ("load more" pagination).
+- **Find (sync):** `find_sync(module, options, get_total=True)` — same contract, blocking.
 - **Find one:** `find_one(module, filter_params)` async; `find_one_sync(module, filter_params)` sync. Both return one record or None.
 - **By ID:** `find_by_id(module: str, id: str) -> Optional[KonectyDict]`.
 - **Create:** `create(module: str, data: KonectyDict) -> Optional[KonectyDict]`. Do not send \_createdAt, \_updatedAt, \_createdBy, \_updatedBy; SDK strips them.

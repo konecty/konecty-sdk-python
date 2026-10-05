@@ -52,6 +52,25 @@ KONECTY_UPDATE_IGNORE_FIELDS = [
 KONECTY_CREATE_IGNORE_FIELDS = ["_updatedAt", "_createdAt", "_updatedBy", "_createdBy"]
 
 
+def _find_query_params(options: KonectyFindParams, get_total: bool) -> Dict[str, str]:
+    """Query string de /rest/data/{module}/find.
+
+    `getTotal=false` só vai para a rede quando a contagem é desligada: com o
+    padrão a query fica idêntica à de antes. Paridade com `KonectyClient.find` do
+    SDK TypeScript, que também só envia o desligamento, sempre no fim da query.
+    """
+    params: Dict[str, str] = {}
+    for key, value in options.model_dump(exclude_none=True).items():
+        params[key] = (
+            json.dumps(value, default=json_serial)
+            if key != "fields"
+            else ",".join(value)
+        )
+    if get_total is False:
+        params["getTotal"] = "false"
+    return params
+
+
 def get_first_dict(items: List[Any]) -> Optional[KonectyDict]:
     """Retorna o primeiro item de uma lista como dicionário ou None se estiver vazia."""
     if not items:
@@ -67,11 +86,20 @@ async def _read_json_body(response: "aiohttp.ClientResponse") -> Optional[Dict[s
     Lê o corpo como JSON sem explodir quando não é JSON (proxy, gateway, HTML).
 
     Devolve ``None`` nesse caso, e o chamador cai no tratamento por status.
+
+    Também devolve ``None`` quando o corpo é JSON válido mas **não é objeto** —
+    uma string ou lista, que é o que alguns proxies devolvem. O ``cast`` não
+    verifica nada em runtime, então sem esta checagem o chamador fazia
+    ``result.get(...)`` num ``str`` e recebia ``AttributeError`` no lugar do erro
+    de API.
     """
     try:
-        return cast(Dict[str, Any], await response.json(content_type=None))
+        body = await response.json(content_type=None)
     except Exception:  # noqa: BLE001 - corpo não-JSON é caso esperado aqui
         return None
+    if not isinstance(body, dict):
+        return None
+    return cast(Dict[str, Any], body)
 
 
 class KonectyClient:
@@ -655,14 +683,16 @@ class KonectyClient:
             query_id, shared_with, is_public=is_public
         )
 
-    async def find(self, module: str, options: KonectyFindParams) -> List[KonectyDict]:
-        params: Dict[str, str] = {}
-        for key, value in options.model_dump(exclude_none=True).items():
-            params[key] = (
-                json.dumps(value, default=json_serial)
-                if key != "fields"
-                else ",".join(value)
-            )
+    async def find(
+        self, module: str, options: KonectyFindParams, get_total: bool = True
+    ) -> List[KonectyDict]:
+        """Busca registros em GET /rest/data/{module}/find.
+
+        `get_total=False` pede ao servidor para não contar o total (a resposta vem
+        sem `total`), o que acelera listagens grandes quando o total não é
+        necessário. Com o padrão (`True`) nada é enviado e a URL é a mesma de antes.
+        """
+        params = _find_query_params(options, get_total)
 
         async with (
             aiohttp.ClientSession() as session,
@@ -698,7 +728,6 @@ class KonectyClient:
         if search:
             params["search"] = search
 
-        print(f"params: {params}")
         async with (
             aiohttp.ClientSession() as session,
             session.get(
@@ -707,24 +736,24 @@ class KonectyClient:
                 headers={"Authorization": self.headers["Authorization"]},
             ) as response,
         ):
-            response.raise_for_status()
-            result = await response.json()
+            # Mesma ordem do `find`: corpo primeiro, status depois. Ver `find`.
+            result = await _read_json_body(response)
+            if result is None:
+                response.raise_for_status()
+                raise KonectyAPIError(f"{response.status} {response.reason}")
             if not result.get("success", False):
                 errors = result.get("errors", [])
                 logger.error(errors)
-                raise KonectyAPIError(errors)
+                raise_for_konecty_errors(errors)
+            response.raise_for_status()
             data = result.get("data", [])
             return cast(List[KonectyDict], data)
 
-    def find_sync(self, module: str, options: KonectyFindParams) -> List[KonectyDict]:
-        """Versão síncrona de find."""
-        params: Dict[str, str] = {}
-        for key, value in options.model_dump(exclude_none=True).items():
-            params[key] = (
-                json.dumps(value, default=json_serial)
-                if key != "fields"
-                else ",".join(value)
-            )
+    def find_sync(
+        self, module: str, options: KonectyFindParams, get_total: bool = True
+    ) -> List[KonectyDict]:
+        """Versão síncrona de find (mesma semântica de `get_total`)."""
+        params = _find_query_params(options, get_total)
 
         import requests
 
@@ -767,12 +796,16 @@ class KonectyClient:
                 headers={"Authorization": self.headers["Authorization"]},
             ) as response,
         ):
-            response.raise_for_status()
-            result = await response.json()
+            # Mesma ordem do `find`: corpo primeiro, status depois. Ver `find`.
+            result = await _read_json_body(response)
+            if result is None:
+                response.raise_for_status()
+                raise KonectyAPIError(f"{response.status} {response.reason}")
             if not result.get("success", False):
                 errors = result.get("errors", [])
                 logger.error(errors)
-                raise KonectyAPIError(errors)
+                raise_for_konecty_errors(errors)
+            response.raise_for_status()
             data = result.get("data", [None])
             return get_first_dict(data)
 
@@ -1005,12 +1038,16 @@ class KonectyClient:
                 headers={"Authorization": self.headers["Authorization"]},
             ) as response,
         ):
-            response.raise_for_status()
-            result = await response.json()
+            # Mesma ordem do `find`: corpo primeiro, status depois. Ver `find`.
+            result = await _read_json_body(response)
+            if result is None:
+                response.raise_for_status()
+                raise KonectyAPIError(f"{response.status} {response.reason}")
             if not result.get("success", False):
                 errors = result.get("errors", [])
                 logger.error(errors)
-                raise KonectyAPIError(errors)
+                raise_for_konecty_errors(errors)
+            response.raise_for_status()
             count = result.get("total", 0)
             return count
 

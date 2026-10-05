@@ -17,7 +17,11 @@ class StubServer:
         self.app.router.add_route("*", "/{tail:.*}", self._handle)
 
     def route(self, method: str, path: str, body: Any, status: int = 200) -> None:
-        """Register the response for a method/path pair."""
+        """Register the response for a method/path pair.
+
+        `body` vira JSON, exceto quando já é um `web.Response` (ex.: NDJSON do findStream), que é
+        devolvido como está; nesse caso `status` é ignorado e a rota atende uma única requisição.
+        """
         self._responses[(method.upper(), path)] = (body, status)
 
     async def _handle(self, request: web.Request) -> web.Response:
@@ -44,6 +48,8 @@ class StubServer:
                 {"success": False, "errors": [{"message": "not stubbed"}]}, status=404
             )
         body, status = response
+        if isinstance(body, web.Response):
+            return body
         return web.json_response(body, status=status)
 
 
