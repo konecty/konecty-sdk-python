@@ -467,6 +467,14 @@ class KonectyClient:
         """Get login method flags for the namespace (GET /api/auth/login-options)."""
         return await self._auth.get_login_options()
 
+    async def info(self) -> Dict[str, Any]:
+        """
+        Get the session user (GET /rest/auth/info), including ``user["redirectURL"]``.
+
+        Returns ``{"logged": False}`` without a token or when the server refuses the session.
+        """
+        return await self._auth.info()
+
     @property
     def _pat(self) -> PatService:
         if not hasattr(self, "_pat_service"):
