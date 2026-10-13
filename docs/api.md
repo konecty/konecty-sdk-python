@@ -32,6 +32,7 @@ Quando `success` é falso, o SDK converte a resposta em exceção `KonectyAPIErr
 | `/api/auth/google/start`                                          | GET    | Inicia o login Google (authorization code hospedado pelo Konecty). Query: `client_id`, `redirect_uri`, `state`. Responde 302 para o Google — o SDK apenas monta a URL. | `google_login_url` em client.py (não faz request)   |
 | `/api/auth/google/session`                                        | POST   | Troca o código de uso único (TTL 60s) do callback pela sessão. Corpo: `code` e telemetria opcional (`geolocation`, `resolution`, `source`, `fingerprint`). Retorna `authId` e `user`. | `exchange_google_code` em client.py                 |
 | `/api/auth/login-options`                                         | GET    | Flags de métodos de login do namespace (`passwordEnabled`, `emailOtpEnabled`, `whatsAppOtpEnabled`, `webauthnEnabled`, `webauthnRequired`, `googleEnabled`). | `get_login_options` em client.py                    |
+| `/rest/auth/info`                                                 | GET    | Usuário da sessão e namespace: `logged` e `user` (`_id`, `name`, `email`, `login`, `group`, `role`, `access`, `locale`, `namespace`, `redirectURL` — página para abrir a interface, ou `null`). Sem token não faz request; 4xx/5xx viram `{"logged": False}`. | `info` em client.py                                 |
 
 O parâmetro `module` (ou `document`) identifica o tipo de documento no Konecty (ex.: Contact, User, Setting).
 

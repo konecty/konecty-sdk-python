@@ -1,7 +1,9 @@
-"""Auth API: Google hosted authorization code flow and login options."""
+"""Auth API: Google hosted authorization code flow, login options and session info."""
 
 from typing import Any, Dict, Optional, Union
 from urllib.parse import quote, urlencode
+
+import aiohttp
 
 from ..exceptions import KonectyAPIError, KonectyGoogleSessionError
 from .base import BaseService
@@ -13,6 +15,7 @@ GOOGLE_START_PATH = "/api/auth/google/start"
 _ENCODE_URI_COMPONENT_SAFE = "!*'()"
 GOOGLE_SESSION_PATH = "/api/auth/google/session"
 LOGIN_OPTIONS_PATH = "/api/auth/login-options"
+USER_INFO_PATH = "/rest/auth/info"
 
 
 _GOOGLE_SESSION_ERROR_CODES = (
@@ -132,3 +135,27 @@ class AuthService(BaseService):
         """GET /api/auth/login-options. Flags: passwordEnabled, emailOtpEnabled,
         whatsAppOtpEnabled, webauthnEnabled, webauthnRequired, googleEnabled."""
         return await self._get(LOGIN_OPTIONS_PATH)
+
+    async def info(self) -> Dict[str, Any]:
+        """
+        GET /rest/auth/info. The session user and namespace: ``{"logged": True, "user": {...}}``.
+
+        ``user`` carries ``_id``, ``name``, ``email``, ``login``, ``group``, ``role``, ``access``,
+        ``locale``, ``namespace`` and ``redirectURL`` — the page to open the interface on, or
+        None when the user record sets none. Keys are the wire names, as in the TypeScript SDK.
+
+        Same contract as ``KonectyClient.info()`` in the TypeScript SDK: without a token there is
+        no session to ask about, so no request goes out; a 4xx/5xx answer means not logged. Both
+        return ``{"logged": False}``.
+        """
+        if not self._client.auth_id:
+            return {"logged": False}
+        try:
+            return await self._get(USER_INFO_PATH)
+        except KonectyAPIError:
+            return {"logged": False}
+        except aiohttp.ContentTypeError as error:
+            # 401 sem corpo JSON: o http layer tenta ler JSON antes de olhar o status.
+            if error.status >= 400:
+                return {"logged": False}
+            raise

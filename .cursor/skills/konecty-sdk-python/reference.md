@@ -86,6 +86,7 @@ From **KonectySdkPython.lib.types** only: KonectyUpdateId (for update/delete ids
 | google_login_url               | no    | client_id, redirect_uri?, state?                              | str (no request is made)             |
 | exchange_google_code           | yes   | code, geolocation?, resolution?, source?, fingerprint?        | dict (authId, user); adopts authId   |
 | get_login_options              | yes   |                                                               | dict (…, googleEnabled)              |
+| info                           | yes   |                                                               | dict (logged, user incl. redirectURL)|
 
 ## Project documentation
 
