@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Mapping, Optional, TypedDict, Union
 
 from pydantic import BaseModel, Field
 
+from .feature_types.derived import DerivedExpression
+
 
 class FilterMatch(str, Enum):
     """Tipo de correspondência do filtro."""
@@ -289,3 +291,7 @@ class KonectyFindParams(BaseModel):
     limit: Optional[int] = None
     sort: Optional[List[SortOrder]] = None
     fields: Optional[List[Union[str, int]]] = None
+    #: Campos derivados (ADR-0025): ``{alias: DerivedExpression}``, calculados no servidor
+    #: e devolvidos em todo registro; o alias vale em ``filter`` e ``sort``. Vai na query
+    #: string como JSON, igual a ``filter``/``sort``. Ver ``feature_types/derived.py``.
+    computed: Optional[Dict[str, DerivedExpression]] = None
