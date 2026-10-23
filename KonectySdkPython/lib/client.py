@@ -463,6 +463,18 @@ class KonectyClient:
             fingerprint=fingerprint,
         )
 
+    async def impersonate(
+        self, user_id: Optional[str] = None, code: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Issue a support session (1 h) for another user (POST /api/auth/impersonate).
+
+        Exactly one of ``user_id`` or ``code``. Requires an admin first-party session.
+        Returns ``{"authId", "expiresAt", "user"}``; the returned authId is not adopted by
+        this client. Raises KonectyImpersonateError with a machine-readable ``code``.
+        """
+        return await self._auth.impersonate(user_id=user_id, code=code)
+
     async def get_login_options(self) -> Dict[str, Any]:
         """Get login method flags for the namespace (GET /api/auth/login-options)."""
         return await self._auth.get_login_options()

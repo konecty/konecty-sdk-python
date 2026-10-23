@@ -5,7 +5,11 @@ from urllib.parse import quote, urlencode
 
 import aiohttp
 
-from ..exceptions import KonectyAPIError, KonectyGoogleSessionError
+from ..exceptions import (
+    KonectyAPIError,
+    KonectyGoogleSessionError,
+    KonectyImpersonateError,
+)
 from .base import BaseService
 
 GOOGLE_START_PATH = "/api/auth/google/start"
@@ -16,6 +20,7 @@ _ENCODE_URI_COMPONENT_SAFE = "!*'()"
 GOOGLE_SESSION_PATH = "/api/auth/google/session"
 LOGIN_OPTIONS_PATH = "/api/auth/login-options"
 USER_INFO_PATH = "/rest/auth/info"
+IMPERSONATE_PATH = "/api/auth/impersonate"
 
 
 _GOOGLE_SESSION_ERROR_CODES = (
@@ -26,7 +31,19 @@ _GOOGLE_SESSION_ERROR_CODES = (
 )
 
 
-def _first_error_code(error: KonectyAPIError) -> str:
+_IMPERSONATE_ERROR_CODES = (
+    "IMPERSONATE_FORBIDDEN",
+    "IMPERSONATE_INVALID_TARGET",
+    "IMPERSONATE_TARGET_NOT_FOUND",
+    "IMPERSONATE_TARGET_NOT_ALLOWED",
+    "IMPERSONATED_SESSION_FORBIDDEN",
+    "admin-credential-routes-require-session",
+)
+
+
+def _first_error_code(
+    error: KonectyAPIError, recognised: tuple = _GOOGLE_SESSION_ERROR_CODES
+) -> str:
     """
     Extract the first recognised ``errors[].code``; ``failed`` when there is none.
 
@@ -36,7 +53,7 @@ def _first_error_code(error: KonectyAPIError) -> str:
     errors = error.args[0] if error.args else None
     if isinstance(errors, list):
         for item in errors:
-            if isinstance(item, dict) and item.get("code") in _GOOGLE_SESSION_ERROR_CODES:
+            if isinstance(item, dict) and item.get("code") in recognised:
                 return str(item["code"])
     return "failed"
 
@@ -131,6 +148,52 @@ class AuthService(BaseService):
         self._client.set_auth_id(auth_id)
         return response
 
+    async def impersonate(
+        self, user_id: Optional[str] = None, code: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        POST /api/auth/impersonate. Issues a support session (1 h) for another user.
+
+        Pass exactly one of ``user_id`` (the user's ``_id``, sent as ``userId``) or ``code``
+        (the user's numeric code). The caller must be an admin authenticated with a
+        first-party session. Returns ``{"authId", "expiresAt", "user"}`` (``expiresAt`` is
+        ISO 8601). The returned ``authId`` is NOT adopted by this client — the admin session
+        stays intact.
+
+        Raises KonectyImpersonateError — errors[0].message as the message plus the
+        machine-readable ``code`` — on any failure. Zero or two targets raise
+        ``IMPERSONATE_INVALID_TARGET`` without sending a request. The error subclasses
+        KonectyAPIError, so callers catching that keep working.
+        """
+        if (user_id is not None) == (code is not None):
+            raise KonectyImpersonateError(
+                "IMPERSONATE_INVALID_TARGET", "Pass exactly one of userId or code"
+            )
+        payload: Dict[str, Any] = (
+            {"userId": user_id} if user_id is not None else {"code": code}
+        )
+
+        try:
+            response = await self._post(IMPERSONATE_PATH, json=payload)
+        except KonectyAPIError as error:
+            raise KonectyImpersonateError(
+                _first_error_code(error, _IMPERSONATE_ERROR_CODES),
+                _first_error_message(error),
+            ) from error
+
+        data = response.get("data") if isinstance(response, dict) else None
+        auth_id = data.get("authId") if isinstance(data, dict) else None
+        if not isinstance(auth_id, str) or not auth_id:
+            raise KonectyImpersonateError(
+                "failed", "Impersonate response has no authId"
+            )
+
+        return {
+            "authId": auth_id,
+            "expiresAt": data.get("expiresAt"),
+            "user": data.get("user"),
+        }
+
     async def get_login_options(self) -> Dict[str, Any]:
         """GET /api/auth/login-options. Flags: passwordEnabled, emailOtpEnabled,
         whatsAppOtpEnabled, webauthnEnabled, webauthnRequired, googleEnabled."""
@@ -142,7 +205,9 @@ class AuthService(BaseService):
 
         ``user`` carries ``_id``, ``name``, ``email``, ``login``, ``group``, ``role``, ``access``,
         ``locale``, ``namespace`` and ``redirectURL`` — the page to open the interface on, or
-        None when the user record sets none. Keys are the wire names, as in the TypeScript SDK.
+        None when the user record sets none. In a support session (see ``impersonate``) it also
+        carries ``impersonatedBy`` (``{"_id", "name"}`` of the admin) and ``impersonationExpiresAt``
+        (ISO 8601). Keys are the wire names, as in the TypeScript SDK.
 
         Same contract as ``KonectyClient.info()`` in the TypeScript SDK: without a token there is
         no session to ask about, so no request goes out; a 4xx/5xx answer means not logged. Both
