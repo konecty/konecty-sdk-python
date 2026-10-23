@@ -85,6 +85,7 @@ From **KonectySdkPython.lib.types** only: KonectyUpdateId (for update/delete ids
 | upload_file                    | yes   | module, record_code, field_name, file, file_name?, file_type? | str (file key)                       |
 | google_login_url               | no    | client_id, redirect_uri?, state?                              | str (no request is made)             |
 | exchange_google_code           | yes   | code, geolocation?, resolution?, source?, fingerprint?        | dict (authId, user); adopts authId   |
+| impersonate                    | yes   | user_id? XOR code?                                            | dict (authId, expiresAt, user); not adopted |
 | get_login_options              | yes   |                                                               | dict (…, googleEnabled)              |
 | info                           | yes   |                                                               | dict (logged, user incl. redirectURL)|
 

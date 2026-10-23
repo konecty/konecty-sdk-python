@@ -31,6 +31,26 @@ class KonectyGoogleSessionError(KonectyAPIError):
         self.code = code
 
 
+class KonectyImpersonateError(KonectyAPIError):
+    """
+    Raised by impersonate. Carries the machine-readable ``code`` from ``errors[0].code``
+    (``IMPERSONATE_FORBIDDEN``, ``IMPERSONATE_INVALID_TARGET``,
+    ``IMPERSONATE_TARGET_NOT_FOUND``, ``IMPERSONATE_TARGET_NOT_ALLOWED``,
+    ``IMPERSONATED_SESSION_FORBIDDEN``, ``admin-credential-routes-require-session``);
+    ``failed`` covers transport errors, unreadable bodies and answers without a recognised
+    code, e.g. a plain 401. ``IMPERSONATE_INVALID_TARGET`` is also raised locally, with no
+    request, when the target does not have exactly one of ``user_id`` or ``code``.
+
+    Subclasses KonectyAPIError so existing ``except KonectyAPIError`` keeps working.
+
+    Mirrors KonectyImpersonateError in the TypeScript SDK — keep both in sync.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 #: Código devolvido pelo Konecty quando a requisição pede ordenação arbitrária
 #: acima do teto de página. Espelha ``SORT_ABOVE_MAX_PAGE_SIZE`` no SDK
 #: TypeScript — manter os dois em sincronia.
