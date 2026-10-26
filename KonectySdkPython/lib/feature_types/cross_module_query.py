@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
+from .derived import DerivedExpression
+
 MAX_RELATIONS = 10
 MAX_NESTING_DEPTH = 2
 MAX_RELATION_LIMIT = 100_000
@@ -72,6 +74,9 @@ class CrossModuleQuery(BaseModel):
     )
     groupBy: List[str] = Field(default_factory=list, alias="groupBy")
     aggregators: Dict[str, Aggregator] = Field(default_factory=dict)
+    #: Campos derivados do documento primário (ADR-0025); o alias vale em filter, sort,
+    #: groupBy e aggregators[*].field.
+    computed: Optional[Dict[str, DerivedExpression]] = None
     includeTotal: bool = Field(default=True, alias="includeTotal")
     includeMeta: bool = Field(default=False, alias="includeMeta")
 

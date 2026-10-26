@@ -8,6 +8,7 @@ from .cross_module_query import (
     CrossModuleQuery,
     CrossModuleRelation,
 )
+from .derived import Computed, DerivedExpression, DerivedOp, DerivedOperand
 from .kpi import KpiConfig, KpiOperation
 from .query_json import (
     AggregatorName,
@@ -27,10 +28,14 @@ __all__ = [
     "Aggregator",
     "AggregatorName",
     "AggregatorSpec",
+    "Computed",
     "ConditionValue",
     "CrossModuleQuery",
     "CrossModuleRelation",
     "DEFAULT_PRIMARY_LIMIT",
+    "DerivedExpression",
+    "DerivedOp",
+    "DerivedOperand",
     "ExplicitJoinCondition",
     "FilterMatch",
     "KpiConfig",
