@@ -27,6 +27,7 @@ from .services.comments import CommentsService
 from .services.export import ExportService
 from .services.files import FilesService
 from .services.notifications import NotificationsService
+from .services.mcp_status import McpStatusService
 from .services.pat import PatService
 from .services.query import QueryResult, QueryService
 from .services.stream import FindStreamResult, StreamService
@@ -512,6 +513,25 @@ class KonectyClient:
     async def revoke_pat(self, pat_id: str) -> Dict[str, Any]:
         """Revoke one of the caller's own Personal Access Tokens (DELETE /rest/auth/pat/{pat_id})."""
         return await self._pat.revoke_pat(pat_id)
+
+    @property
+    def _mcp_status(self) -> McpStatusService:
+        if not hasattr(self, "_mcp_status_service"):
+            self._mcp_status_service = McpStatusService(self)
+        return self._mcp_status_service
+
+    async def get_mcp_status(self) -> Dict[str, Any]:
+        """
+        The caller's MCP access level and OAuth-connected agents (GET /rest/auth/mcp/status).
+
+        Requires a first-party session; a PAT or OAuth token raises KonectyAPIError whose
+        errors carry the code ``mcp-status-requires-session``.
+        """
+        return await self._mcp_status.get_mcp_status()
+
+    async def revoke_mcp_connection(self, connection_id: str) -> Dict[str, Any]:
+        """Disconnect one of the caller's agents (DELETE /rest/auth/mcp/connections/{id})."""
+        return await self._mcp_status.revoke_mcp_connection(connection_id)
 
     @property
     def _admin(self) -> AdminService:
