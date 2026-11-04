@@ -61,6 +61,16 @@ From `KonectySdkPython.lib` the same symbols are available; from `KonectySdkPyth
 - **KPI:** `get_kpi(module, kpi_config: KpiConfig, filter_params=None, ...) -> dict` with value and count. KpiConfig from lib.feature_types (operation: count, sum, avg, min, max, countDistinct; field required for countDistinct).
 - **Graph:** `get_graph(module, graph_config, filter_params=None, ...) -> str` (SVG). graph_config: type, xAxis, yAxis, series, etc. (dict or Pydantic).
 - **Pivot:** `get_pivot(module, pivot_config, filter_params=None, ...) -> dict`. pivot_config: rows, columns, values.
+- **Pivot jobs (async pivot):** `create_pivot_job(params)`, `get_pivot_job(id)`, `list_pivot_jobs()`, `get_pivot_job_result(id)`, `cancel_pivot_job(id)`, `run_pivot_job(params, on_progress=None) -> {"job", "result"}`. params: `document`, `pivotConfig`, optional `title`, `filter`, `fields`. `run_pivot_job` creates the job and polls (2 s, 5 s after 1 min); on `failed`/`canceled` it raises `PivotJobError` (`KonectySdkPython.lib.exceptions`, subclass of `KonectyAPIError`) with `.code` (server `error.code`, or `"canceled"`) and `.job`. Cancelling the asyncio task sends a best-effort DELETE and re-raises `CancelledError`.
+
+  ```python
+  out = await client.run_pivot_job(
+      {"document": "Opportunity", "title": "Funil",
+       "pivotConfig": {"rows": [{"field": "status"}], "values": [{"field": "_id", "aggregator": "count"}]}},
+      on_progress=lambda job: print(job["status"], job["processed"]),
+  )
+  rows = out["result"]
+  ```
 - **Comments:** `get_comments(module, data_id)`, `create_comment(module, data_id, text, parent_id=None)`, `update_comment`, `delete_comment`, `search_comment_users(module, data_id, query)`, `search_comments(module, data_id, query=..., author_id=..., ...)`.
 - **Subscriptions:** `get_subscription_status(module, data_id)`, `subscribe(module, data_id)`, `unsubscribe(module, data_id)`.
 - **Notifications:** `list_notifications(read=..., page=..., limit=...)`, `get_unread_notifications_count()`, `mark_notification_read(notification_id)`, `mark_all_notifications_read()`.
