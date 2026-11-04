@@ -266,6 +266,25 @@ def raise_for_konecty_errors(errors: object) -> None:
     raise KonectyAPIError(errors)
 
 
+class PivotJobError(KonectyAPIError):
+    """
+    Raised by run_pivot_job when the job ends ``failed`` or ``canceled``.
+
+    ``code`` is the server's ``error.code`` (``interrupted``, ``too-many-cells``,
+    ``python-memory``, ``timeout``, ``internal``) or ``"canceled"``; ``job`` is the
+    final PivotJob document. Subclasses KonectyAPIError.
+
+    Mirrors PivotJobError in the TypeScript SDK (src/sdk/domains/pivotJobs.ts).
+    """
+
+    def __init__(self, job: dict) -> None:
+        error = job.get("error") or {}
+        code = "canceled" if job.get("status") == "canceled" else error.get("code") or "internal"
+        super().__init__(error.get("message") or f"pivot job {job.get('status')}")
+        self.code = code
+        self.job = job
+
+
 class KonectyValidationError(KonectyError):
     """Raised for validation errors."""
 
