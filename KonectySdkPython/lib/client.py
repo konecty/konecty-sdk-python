@@ -14,6 +14,7 @@ from .exceptions import (
     raise_for_konecty_errors,
 )
 from .feature_types.kpi import KpiConfig
+from .feature_types.pivot_jobs import CreatePivotJobParams, PivotJob, PivotJobResult
 from .file_manager import FileManager
 from .filters import KonectyFilter, KonectyFindParams
 from .http import StreamResponse
@@ -29,6 +30,7 @@ from .services.files import FilesService
 from .services.notifications import NotificationsService
 from .services.mcp_status import McpStatusService
 from .services.pat import PatService
+from .services.pivot_jobs import PivotJobsService
 from .services.query import QueryResult, QueryService
 from .services.stream import FindStreamResult, StreamService
 from .services.subscriptions import SubscriptionsService
@@ -251,6 +253,38 @@ class KonectyClient:
         return await self._aggregation.get_pivot(
             module, pivot_config, filter_params=filter_params, **kwargs
         )
+
+    @property
+    def _pivot_jobs(self) -> PivotJobsService:
+        if not hasattr(self, "_pivot_jobs_service"):
+            self._pivot_jobs_service = PivotJobsService(self)
+        return self._pivot_jobs_service
+
+    async def create_pivot_job(self, params: CreatePivotJobParams) -> PivotJob:
+        """Create a pivot job (POST /rest/pivot/jobs). Returns the job."""
+        return await self._pivot_jobs.create_pivot_job(params)
+
+    async def get_pivot_job(self, job_id: str) -> PivotJob:
+        """Get a pivot job (GET /rest/pivot/jobs/{id})."""
+        return await self._pivot_jobs.get_pivot_job(job_id)
+
+    async def list_pivot_jobs(self) -> List[PivotJob]:
+        """List the user's pivot jobs (GET /rest/pivot/jobs)."""
+        return await self._pivot_jobs.list_pivot_jobs()
+
+    async def get_pivot_job_result(self, job_id: str) -> PivotJobResult:
+        """Get the result blob of a done job (GET /rest/pivot/jobs/{id}/result)."""
+        return await self._pivot_jobs.get_pivot_job_result(job_id)
+
+    async def cancel_pivot_job(self, job_id: str) -> PivotJob:
+        """Cancel a pivot job (DELETE /rest/pivot/jobs/{id})."""
+        return await self._pivot_jobs.cancel_pivot_job(job_id)
+
+    async def run_pivot_job(
+        self, params: CreatePivotJobParams, on_progress: Any = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """Create a job and poll until done. Returns {"job", "result"}; raises PivotJobError."""
+        return await self._pivot_jobs.run_pivot_job(params, on_progress, **kwargs)
 
     @property
     def _export(self) -> ExportService:
