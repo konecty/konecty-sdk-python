@@ -120,13 +120,29 @@ class AdminService(BaseService):
 
     async def get_mcp_access(self) -> Dict[str, Any]:
         """
-        GET /api/admin/mcp-access. Returns `data`: {roles, readRoleIds, writeRoleIds, readOnlyConfig}.
+        GET /api/admin/mcp-access. Returns `data`: {roles, readRoleIds, writeRoleIds,
+        activeUsersByRoleSet, readOnlyConfig}.
+
+        `roles` is every role a picker needs from one call, each `{_id, name?, admin?,
+        registered?}`: the roles registered in `Role` (`registered: True`), plus the roles
+        active users carry (`user.role` / `user.roles[]`) and the ids already in the lists,
+        even when they are not registered (`registered: False`). An unregistered role takes
+        its `name` from the users that carry it, and has no `name` when only the lists
+        reference it. Roles carried only by inactive users are left out.
 
         `readRoleIds` are the roles allowed to reach the MCP; `writeRoleIds` the subset
         also allowed to use write/destructive tools (a role listed there reads too, whether
-        or not it also appears in `readRoleIds`). `readOnlyConfig` is true when the
-        deployment loads its namespace config from a metadata directory — `update_mcp_access`
-        then refuses with 409.
+        or not it also appears in `readRoleIds`).
+
+        `activeUsersByRoleSet` is `[{roleIds, count}]`: active users per distinct combination
+        of roles — counts only, never who they are — so a caller can tell before saving how
+        many active users would lose MCP access (or only write access) without counting twice
+        a user with two roles.
+
+        `registered` and `activeUsersByRoleSet` are absent on servers older than these fields.
+
+        `readOnlyConfig` is true when the deployment loads its namespace config from a
+        metadata directory — `update_mcp_access` then refuses with 409.
         """
         return await self._get(ADMIN_MCP_ACCESS_PATH)
 
@@ -136,8 +152,10 @@ class AdminService(BaseService):
         """
         PUT /api/admin/mcp-access. Wire body: {readRoleIds, writeRoleIds}.
 
-        Replaces both lists wholesale (a role omitted loses access). An unknown role id
-        is rejected with 400 and nothing is written; a deployment configured by a metadata
+        Replaces both lists wholesale (a role omitted loses access). Any id `get_mcp_access`
+        lists in `roles` is accepted — registered, carried by an active user, or already in
+        the lists. Only an id none of those sources know is rejected, with 400
+        `Unknown role: <id>`, and nothing is written; a deployment configured by a metadata
         directory answers 409 with code `mcp-access-config-read-only`.
         """
         return await self._put(
