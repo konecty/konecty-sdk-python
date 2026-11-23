@@ -45,6 +45,7 @@ From `KonectySdkPython.lib` the same symbols are available; from `KonectySdkPyth
 - **Find (sync):** `find_sync(module, options, get_total=True)` — same contract, blocking.
 - **Find one:** `find_one(module, filter_params)` async; `find_one_sync(module, filter_params)` sync. Both return one record or None.
 - **By ID:** `find_by_id(module: str, id: str) -> Optional[KonectyDict]`.
+- **History:** `get_history(module: str, id: str) -> list[KonectyDict]` — GET /rest/data/{module}/{id}/history. `success: false` (FORBIDDEN; NOT_FOUND when the record is outside the profile `readFilter`) raises `KonectyAPIError` with the server `errors`, never an empty list. Mirrors TS `getHistory`.
 - **Create:** `create(module: str, data: KonectyDict) -> Optional[KonectyDict]`. Do not send \_createdAt, \_updatedAt, \_createdBy, \_updatedBy; SDK strips them.
 - **Update one:** `update_one(module, id, updatedAt: datetime, data: KonectyDict)`. Requires current \_updatedAt for concurrency.
 - **Update many:** `update(module, ids: list[KonectyUpdateId], data: KonectyDict) -> list[KonectyDict]`. Each id is dict with \_id and \_updatedAt (use `KonectyUpdateId.from_dict`).
