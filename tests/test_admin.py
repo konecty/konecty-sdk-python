@@ -458,6 +458,42 @@ async def test_get_mcp_access_returns_roles_and_lists(stub_server) -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_mcp_access_returns_unregistered_roles_and_active_user_counts(stub_server) -> None:
+    """Equivalent TS test: src/__test__/api/adminMcpAccess.test.ts — 'Should return roles outside
+    the Role registry and the active-user counts verbatim'.
+
+    Same input and same expected output as the TS test: roles outside `Role` come back with
+    `registered: False` (one named by its users, one referenced only by the lists), and
+    `activeUsersByRoleSet` is passed through untouched.
+    """
+    data = {
+        "roles": [
+            {"_id": "role-admin", "name": "Admin", "admin": True, "registered": True},
+            {"_id": "role-legacy", "name": "Sócio-Diretor", "registered": False},
+            {"_id": "role-listed-only", "registered": False},
+        ],
+        "readRoleIds": ["role-admin", "role-legacy", "role-listed-only"],
+        "writeRoleIds": ["role-admin"],
+        "activeUsersByRoleSet": [
+            {"roleIds": ["role-admin"], "count": 2},
+            {"roleIds": ["role-legacy"], "count": 7},
+            {"roleIds": ["role-admin", "role-legacy"], "count": 1},
+        ],
+        "readOnlyConfig": False,
+    }
+    stub_server.route("GET", "/api/admin/mcp-access", {"success": True, "data": data})
+
+    result = await _client(stub_server).get_mcp_access()
+
+    assert result == {"success": True, "data": data}
+    assert [role["_id"] for role in result["data"]["roles"] if role.get("registered") is False] == [
+        "role-legacy",
+        "role-listed-only",
+    ]
+    assert sum(entry["count"] for entry in result["data"]["activeUsersByRoleSet"]) == 10
+
+
+@pytest.mark.asyncio
 async def test_get_mcp_access_returns_forbidden_for_non_admin(stub_server) -> None:
     """Equivalent TS test: src/__test__/api/adminMcpAccess.test.ts — 403 'Admin access required'."""
     stub_server.route(
