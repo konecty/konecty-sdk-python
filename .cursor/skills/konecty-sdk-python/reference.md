@@ -35,6 +35,7 @@ From **KonectySdkPython.lib.types** only: KonectyUpdateId (for update/delete ids
 | find_one                       | yes   | module, KonectyFilter                                         | Optional[KonectyDict]                |
 | find_one_sync                  | no    | module, KonectyFilter                                         | Optional[KonectyDict]                |
 | find_by_id                     | yes   | module, id                                                    | Optional[KonectyDict]                |
+| get_history                    | yes   | module, id                                                    | list[KonectyDict]                    |
 | find_stream                    | yes   | module, KonectyFindParams, include_total?                     | FindStreamResult (.stream, .total)   |
 | count_stream                   | yes   | module, filter_params?, \*\*kwargs                            | int                                  |
 | download_file                  | yes   | module, record_code, field_name, file_name                    | bytes                                |

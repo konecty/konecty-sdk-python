@@ -883,6 +883,34 @@ class KonectyClient:
             data = result.get("data", [None])
             return get_first_dict(data)
 
+    async def get_history(self, module: str, id: str) -> List[KonectyDict]:
+        """Histórico de alterações de um registro: GET /rest/data/{module}/{id}/history.
+
+        Espelha `getHistory` do SDK TypeScript. O servidor nega o histórico com
+        `{success: false, errors}` (FORBIDDEN sem permissão de leitura; NOT_FOUND com o
+        registro fora do `readFilter` do perfil), em geral com HTTP 200: isso vira
+        `KonectyAPIError` com os mesmos `errors`, nunca uma lista vazia.
+        """
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(
+                f"{self.base_url}/rest/data/{module}/{id}/history",
+                headers={"Authorization": self.headers["Authorization"]},
+            ) as response,
+        ):
+            # Mesma ordem do `find`: corpo primeiro, status depois. Ver `find`.
+            result = await _read_json_body(response)
+            if result is None:
+                response.raise_for_status()
+                raise KonectyAPIError(f"{response.status} {response.reason}")
+            if not result.get("success", False):
+                errors = result.get("errors", [])
+                logger.error(errors)
+                raise_for_konecty_errors(errors)
+            response.raise_for_status()
+            data = result.get("data") or []
+            return cast(List[KonectyDict], data)
+
     async def find_one(
         self, module: str, filter_params: KonectyFilter
     ) -> Optional[KonectyDict]:
