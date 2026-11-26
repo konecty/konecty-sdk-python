@@ -103,5 +103,6 @@ From **KonectySdkPython.lib.types** only: KonectyUpdateId (for update/delete ids
 - **docs/README.md** — Index of documentation.
 - **docs/api.md** — Konecty REST endpoints used by the SDK, request/response format, filter format.
 - **docs/development.md** — Environment, package structure, build, env vars.
+- **docs/cli-metas.md** — `konecty-cli metas` (base + delta metadata): client repo layout, commands, artifact format.
 
 Read those files when you need endpoint-level details or contribution instructions.

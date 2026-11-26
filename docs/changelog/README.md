@@ -4,6 +4,7 @@ Histórico de alterações do Konecty SDK Python. Cada entrada é um arquivo mar
 
 ## Índice por data
 
+- [2026-11-26 — `konecty-cli metas` (base + delta)](2026-11-26_konecty-cli-metas.md)
 - [2026-03-25 — Documentação do lookup assíncrono](2026-03-25_documentacao-lookup-assincrono.md)
 - [2025-03-13 — Criador de query tipado para query/json (QueryJson, QueryRelation, etc.)](2025-03-13_criador-query-json-tipado.md)
 - [2025-03-13 — Implementação das features do plano (stream, files, export, KPI, graph, pivot, comments, subscriptions, notifications, change user, query, saved queries)](2025-03-13_implementacao-features-sdk.md)

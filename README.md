@@ -22,6 +22,15 @@ konecty-cli apply --mongo-url="..." --database my-db
 uvx --from konecty-sdk-python konecty-cli pull --all --mongo-url="..." --database my-db
 ```
 
+##### Base + delta metadata (`konecty-cli metas`)
+
+```sh
+konecty-cli metas montar ./meu-cliente --ambiente dev --saida dist/
+konecty-cli metas aplicar dist/   # KONECTY_URL, KONECTY_TOKEN, TENANT_ENV
+```
+
+See [docs/cli-metas.md](docs/cli-metas.md).
+
 #### Google login
 
 The Konecty core hosts the whole authorization code flow: your app never talks to Google
