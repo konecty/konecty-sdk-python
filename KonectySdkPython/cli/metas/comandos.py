@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -9,7 +10,9 @@ import click
 
 from .erros import MetasInvalidasError
 from .gerar_delta import gerar_delta
-from .montar import BASE_REPO_PADRAO, montar
+from .linter import linter
+from .montar import BASE_REPO_PADRAO, montar, obter_base
+from .repositorio import ler_config
 
 
 @click.group(name="metas")
@@ -73,3 +76,29 @@ def gerar_delta_command(
         f"{len(resumo.hooks)} hooks, {len(resumo.modulos)} módulos só do cliente, "
         f"{len(resumo.removidos)} removidos, {resumo.iguais} iguais à base"
     )
+
+
+@metas_group.command(name="linter")
+@click.argument("repo", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option(
+    "--base-dir",
+    default=None,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="metadata/base já extraída (pula o download da tag)",
+)
+@click.option("--base-repo", default=BASE_REPO_PADRAO, show_default=True, help="Repositório Git com as tags base-metas/*")
+def linter_command(repo: Path, base_dir: Optional[Path], base_repo: str) -> None:
+    """Acusa delta redundante e conflito com a base. Sai com 1 se houver erro."""
+    try:
+        with tempfile.TemporaryDirectory(prefix="metas-base-") as temporario:
+            raiz = base_dir or obter_base(ler_config(repo).base, base_repo, Path(temporario))
+            achados = linter(repo, raiz)
+    except MetasInvalidasError as erro:
+        raise click.ClickException(str(erro)) from None
+    for achado in achados:
+        click.echo(str(achado))
+    erros = sum(1 for achado in achados if achado.nivel == "erro")
+    avisos = len(achados) - erros
+    click.echo(f"linter: {erros} erros, {avisos} avisos")
+    if erros:
+        raise SystemExit(1)
