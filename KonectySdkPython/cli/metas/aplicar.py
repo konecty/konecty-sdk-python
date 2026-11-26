@@ -1,10 +1,12 @@
 """`metas aplicar`: leva um artefato a um tenant pela API, sem Mongo (MBD-06, 08, 09).
 
 1. confere o sha256 do artefato e o `ambiente` do manifesto contra `TENANT_ENV` (código 2);
-2. faz o `dryRun` do lote (`hookMode: 'replace'`, o artefato traz o documento completo);
-3. com plano vazio e `metadataVersion` igual, termina com `aplicados=0`, sem escrever;
-4. senão envia só os documentos criados ou alterados, com `hookMode: 'replace'` e
-   `namespacePatch` (`namespace.json` mais `metadataVersion`), `deleteRemoved` nunca;
+2. faz o `dryRun` do lote (`hookMode: 'replace'`, o artefato traz o documento completo) com o
+   `namespacePatch` de identidade (`namespace.json` mais `metadataVersion`). O PAT não lê o
+   Namespace: quem diz se ele muda é o `plan.namespace.keys` do core (AD-MBD-003);
+3. sem item a criar ou alterar e com `plan.namespace.keys` vazio, termina com `aplicados=0`;
+4. senão envia só os documentos criados ou alterados, com `hookMode: 'replace'` e o
+   `namespacePatch` mais `metadataAplicacao` (data, quem aplicou, commit), `deleteRemoved` nunca;
 5. 5xx ou falha de rede: 3 novas tentativas, depois de 5, 15 e 45 s;
 6. 400: os erros vêm mapeados para o `_id` e o arquivo de origem (código 1).
 
@@ -31,12 +33,6 @@ ESPERAS_PADRAO = (5.0, 15.0, 45.0)
 _INDICE_EM_DETALHE = re.compile(r"index (\d+)")
 
 Dormir = Callable[[float], Awaitable[Any]]
-LerVersao = Callable[[], Awaitable[Optional[Dict[str, Any]]]]
-
-
-class VersaoIlegivelError(Exception):
-    """O `metadataVersion` do tenant não pôde ser lido com esta credencial."""
-
 
 @dataclass
 class ResultadoAplicacao:
@@ -128,34 +124,6 @@ def erro_do_lote(erro: KonectyMetaBulkError, enviados: List[str], origens: Dict[
 # --------------------------------------------------------------------------- versão
 
 
-def _procurar_versao(resposta: Any) -> Optional[Dict[str, Any]]:
-    candidatos = [resposta]
-    if isinstance(resposta, dict):
-        dados = resposta.get("data")
-        candidatos += dados if isinstance(dados, list) else [dados]
-    for candidato in candidatos:
-        if isinstance(candidato, dict) and isinstance(candidato.get("metadataVersion"), dict):
-            return candidato["metadataVersion"]
-    return None
-
-
-def leitor_de_versao(client: Any) -> LerVersao:
-    """Lê `metadataVersion` do Namespace por `GET /api/admin/meta/Namespace`.
-
-    Devolve `None` quando o tenant não tem a chave; levanta `VersaoIlegivelError` quando a rota
-    recusa a credencial (o core não expõe essa leitura a PAT de service account hoje).
-    """
-
-    async def ler() -> Optional[Dict[str, Any]]:
-        try:
-            resposta = await client.read_meta("Namespace")
-        except Exception as erro:  # noqa: BLE001 - qualquer recusa vira "não sei"
-            raise VersaoIlegivelError(type(erro).__name__) from None
-        return _procurar_versao(resposta)
-
-    return ler
-
-
 async def quem_aplica(client: Any) -> str:
     try:
         info = await client.info()
@@ -165,28 +133,27 @@ async def quem_aplica(client: Any) -> str:
     return str(usuario.get("_id")) if isinstance(usuario, dict) and usuario.get("_id") else "desconhecido"
 
 
-def versao_do_artefato(artefato: Artefato, aplicado_por: str, origem: Optional[str], agora: datetime) -> Dict[str, Any]:
+def versao_do_artefato(artefato: Artefato) -> Dict[str, Any]:
+    """A identidade do artefato. Estável: aplicar o mesmo artefato de novo dá o mesmo valor."""
     m = artefato.manifesto
-    versao: Dict[str, Any] = {
+    return {
         "cliente": m.get("cliente"),
         "versaoCliente": m.get("versaoCliente"),
         "base": m.get("base"),
         "sha256": m.get("sha256Total"),
         "ambiente": m.get("ambiente"),
+    }
+
+
+def aplicacao(aplicado_por: str, origem: Optional[str], agora: datetime) -> Dict[str, Any]:
+    """Quando, por quem e de qual commit. Fica fora do `metadataVersion` para não sujar o dryRun."""
+    dados: Dict[str, Any] = {
         "aplicadoEm": agora.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
         "aplicadoPor": aplicado_por,
     }
     if origem:
-        versao["origem"] = origem
-    return versao
-
-
-def _mesma_versao(atual: Optional[Dict[str, Any]], artefato: Artefato) -> bool:
-    return (
-        isinstance(atual, dict)
-        and atual.get("sha256") == artefato.manifesto.get("sha256Total")
-        and atual.get("ambiente") == artefato.manifesto.get("ambiente")
-    )
+        dados["origem"] = origem
+    return dados
 
 
 # --------------------------------------------------------------------------- aplicar
@@ -198,7 +165,6 @@ async def aplicar(
     *,
     tenant_env: Optional[str],
     origem: Optional[str] = None,
-    ler_versao: Optional[LerVersao] = None,
     esperas: Sequence[float] = ESPERAS_PADRAO,
     dormir: Optional[Dormir] = None,
     agora: Optional[Callable[[], datetime]] = None,
@@ -209,10 +175,13 @@ async def aplicar(
     origens: Dict[str, List[str]] = artefato.manifesto.get("origens") or {}
     todos = [str(item["_id"]) for item in artefato.itens]
     por_id = artefato.por_id
+    patch_identidade = {**artefato.namespace, "metadataVersion": versao_do_artefato(artefato)}
 
     try:
         simulado = await chamar_com_retry(
-            lambda: client.apply_meta_bulk(artefato.itens, dry_run=True, hook_mode="replace"),
+            lambda: client.apply_meta_bulk(
+                artefato.itens, dry_run=True, hook_mode="replace", namespace_patch=patch_identidade
+            ),
             "dryRun do lote",
             esperas,
             dormir,
@@ -230,20 +199,15 @@ async def aplicar(
     if hooks_removidos:
         logger.warning("dryRun: hooks que o artefato remove: %s", hooks_removidos)
 
-    try:
-        atual = await (ler_versao or leitor_de_versao(client))()
-        legivel = True
-    except VersaoIlegivelError as erro:
-        atual, legivel = None, False
-        logger.warning("metadataVersion do tenant ilegível com esta credencial (%s)", erro)
+    chaves_namespace = sorted((plano.get("namespace") or {}).get("keys") or [])
+    if chaves_namespace:
+        logger.info("dryRun: Namespace muda em %s", ", ".join(chaves_namespace))
 
     mudados = criados + atualizados
     resultado = ResultadoAplicacao(
         aplicados=0, criados=criados, atualizados=atualizados, hooks_removidos=hooks_removidos
     )
-    if not mudados and (_mesma_versao(atual, artefato) or not legivel):
-        if not legivel:
-            logger.warning("plano vazio e versão não conferida: nada gravado, metadataVersion não atualizado")
+    if not mudados and not chaves_namespace:
         logger.info("aplicados=0: o tenant já está no artefato %s", artefato.manifesto.get("sha256Total"))
         return resultado
 
@@ -251,8 +215,8 @@ async def aplicar(
     enviados = sorted(mudados) or [todos[0]]
     momento = (agora or (lambda: datetime.now(timezone.utc)))()
     patch_namespace = {
-        **artefato.namespace,
-        "metadataVersion": versao_do_artefato(artefato, await quem_aplica(client), origem, momento),
+        **patch_identidade,
+        "metadataAplicacao": aplicacao(await quem_aplica(client), origem, momento),
     }
     try:
         resposta = await chamar_com_retry(

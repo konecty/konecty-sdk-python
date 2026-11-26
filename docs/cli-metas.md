@@ -43,12 +43,12 @@ Regras do delta:
 | `metas gerar-delta <base-dir> <cópia> --saida <repo> --cliente X --base <tag>` | Migração inicial: escreve `delta/`, `modulos/` e `metadados.yaml` a partir de uma cópia completa. Garante `montar(gerar-delta(base, cópia)) == cópia`. Não migra o `Namespace.json` (segredos) |
 | `metas linter <repo> [--base-dir D]` | Erro para patch que repete a base, `null` em chave que a base não tem, campo novo sem `type` e módulo de `modulos/` com nome da base fora de `naoMigrados`; aviso para lista igual à da base. Sai com 1 se houver erro |
 | `metas diff <dist-a> <dist-b> [--markdown]` | Diff por documento e chave (`fields.<campo>`, hooks marcados). `--markdown` para comentário de PR |
-| `metas aplicar <dist> [--url URL]` | Confere sha256 e `ambiente` contra `TENANT_ENV` (código 2, nada enviado); `dryRun`; plano vazio e versão igual: `aplicados=0`; senão aplica só o que mudou com `hookMode: 'replace'` e `namespacePatch` (`namespace.json` + `metadataVersion`). 5xx/rede: 3 novas tentativas (5, 15, 45 s). 400: erros mapeados para `_id` e arquivo (código 1) |
+| `metas aplicar <dist> [--url URL]` | Confere sha256 e `ambiente` contra `TENANT_ENV` (código 2, nada enviado); `dryRun` com `namespacePatch` (`namespace.json` + `metadataVersion`); nenhum item a criar ou alterar e `plan.namespace.keys` vazio: `aplicados=0`; senão aplica só o que mudou com `hookMode: 'replace'` e o mesmo `namespacePatch` mais `metadataAplicacao`. 5xx/rede: 3 novas tentativas (5, 15, 45 s). 400: erros mapeados para `_id` e arquivo (código 1) |
 | `metas deriva <dist> [--url URL] [--tenant T]` | Só `dryRun`. Imprime `konecty_metadata_drift_documents{tenant="T"} N` (linha para o Loki virar métrica) e a lista por documento e chave |
 
 Variáveis de ambiente de `aplicar` e `deriva`: `KONECTY_URL` (ou `--url`), `KONECTY_TOKEN` (PAT de
 service account com `metaApply`; vai só no header `Authorization`, nunca em log), `TENANT_ENV`
-(`dev`/`prod`) e, opcional, `GIT_COMMIT` (vira `metadataVersion.origem`).
+(`dev`/`prod`) e, opcional, `GIT_COMMIT` (vira `metadataAplicacao.origem`).
 
 ## Artefato
 
@@ -67,12 +67,17 @@ manifesto.json   # cliente, versaoCliente, base, konectyMin, ambiente, deltaByte
   os bytes desses mesmos arquivos na base (emenda E1).
 - Duas montagens do mesmo commit dão os mesmos bytes, inclusive o `.tar.gz` de `--tar`.
 
-`metadataVersion` gravado no Namespace: `{cliente, versaoCliente, base, sha256, ambiente,
-aplicadoEm, aplicadoPor, origem?}`.
+Gravado no Namespace:
 
-## Limitação conhecida
+- `metadataVersion`: `{cliente, versaoCliente, base, sha256, ambiente}`, a identidade do artefato. É
+  estável: reaplicar o mesmo artefato dá o mesmo valor.
+- `metadataAplicacao`: `{aplicadoEm, aplicadoPor, origem?}`, quando, por quem e de qual commit.
 
-O core não expõe a leitura do `metadataVersion` a um PAT de service account (`/api/admin/meta/*`
-recusa PAT). O `aplicar` tenta `GET /api/admin/meta/Namespace`; quando a leitura é recusada e o
-`dryRun` vem vazio, ele não escreve nada (prioriza "reaplicar não escreve") e avisa no log que a
-versão não foi conferida. Com plano não vazio, a versão é gravada normalmente.
+O PAT da service account não lê o Namespace (`/api/admin/meta/*` recusa PAT). Por isso o `aplicar`
+manda o `namespacePatch` de identidade já no `dryRun`, e o core devolve em `plan.namespace.keys` as
+chaves que mudariam (Konecty com `plan.namespace`; AD-MBD-003). Data e autor ficam fora do
+`metadataVersion` para que essa comparação dê vazio quando nada mudou. Um tenant com os itens iguais
+ao artefato e sem `metadataVersion` recebe a versão; um que já tem tudo igual não recebe escrita.
+
+Requer um Konecty cujo `dryRun` devolva `plan.namespace`. Num core sem isso, o plano não traz a
+chave e o `aplicar` só escreve quando há item a criar ou alterar.

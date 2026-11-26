@@ -10,7 +10,9 @@ Novo grupo de comandos `konecty-cli metas` (`montar`, `gerar-delta`, `linter`, `
 Cada cliente imobiliário mantinha uma cópia completa do metadado e aplicava direto no Mongo. Com o
 `metas`, o repositório do cliente guarda só o delta sobre a `metadata/base`, o CI monta um artefato
 determinístico e um Job aplica pela API (`POST /api/document` em lote, com `dryRun`), sem credencial
-de banco, gravando `metadataVersion` no Namespace.
+de banco, gravando `metadataVersion` (identidade do artefato) e `metadataAplicacao` (data, autor,
+commit) no Namespace. Se o Namespace muda é o `plan.namespace` do `dryRun` que diz, porque o PAT não lê
+o Namespace.
 
 ## O que mudou
 
