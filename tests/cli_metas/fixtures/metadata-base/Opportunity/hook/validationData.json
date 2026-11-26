@@ -1,0 +1,60 @@
+{
+  "pipeimobRequired": {
+    "asSystem": true,
+    "when": {
+      "field": "subPhase",
+      "equals": "Proposta aceita",
+      "changed": true
+    },
+    "fields": "key, value",
+    "document": "Setting",
+    "filter": {
+      "match": "and",
+      "conditions": [
+        {
+          "term": "key",
+          "operator": "equals",
+          "value": "PIPEIMOB_REQUIRED_FIELDS"
+        }
+      ]
+    }
+  },
+  "pipeimobContact": {
+    "asSystem": true,
+    "when": {
+      "field": "subPhase",
+      "equals": "Proposta aceita",
+      "changed": true
+    },
+    "document": "Contact",
+    "filter": {
+      "match": "and",
+      "conditions": [
+        {
+          "term": "_id",
+          "operator": "equals",
+          "value": "$this.contact._id"
+        }
+      ]
+    }
+  },
+  "pipeimobProductBroker": {
+    "asSystem": true,
+    "when": {
+      "field": "subPhase",
+      "equals": "Proposta aceita",
+      "changed": true
+    },
+    "document": "Product",
+    "filter": {
+      "match": "and",
+      "conditions": [
+        {
+          "term": "_id",
+          "operator": "equals",
+          "value": "$this.productBroker._id"
+        }
+      ]
+    }
+  }
+}

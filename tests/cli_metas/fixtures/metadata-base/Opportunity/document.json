@@ -1,0 +1,2398 @@
+{
+  "_id": "Opportunity",
+  "description": {
+    "en": "Real estate leads and opportunities",
+    "pt_BR": "Leads e oportunidades imobiliárias"
+  },
+  "icon": "screenshot",
+  "label": {
+    "en": "Opportunity",
+    "pt_BR": "Oportunidade"
+  },
+  "menuSorter": 10,
+  "name": "Opportunity",
+  "type": "document",
+  "plurals": {
+    "en": "Opportunities",
+    "pt_BR": "Oportunidades"
+  },
+  "saveHistory": true,
+  "fields": {
+    "rentalSeal": {
+      "isSortable": true,
+      "label": {
+        "en": "Rental seal",
+        "pt_BR": "Selo da locação"
+      },
+      "maxSelected": 1,
+      "minSelected": 0,
+      "name": "rentalSeal",
+      "options": {
+        "Pendente": {
+          "en": "Pending",
+          "pt_BR": "Pendente",
+          "sort": 1
+        },
+        "Pré-analisada": {
+          "en": "Pre-analyzed",
+          "pt_BR": "Pré-analisada",
+          "sort": 2
+        },
+        "Completa": {
+          "en": "Complete",
+          "pt_BR": "Completa",
+          "sort": 3
+        }
+      },
+      "optionsSorter": "sort",
+      "renderAs": "without_scroll",
+      "type": "picklist"
+    },
+    "rentalSealReason": {
+      "label": {
+        "en": "Rental seal reason",
+        "pt_BR": "Motivo do selo da locação"
+      },
+      "name": "rentalSealReason",
+      "type": "text"
+    },
+    "_createdAt": {
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Created At",
+        "pt_BR": "Criado em"
+      },
+      "name": "_createdAt",
+      "type": "dateTime"
+    },
+    "_createdBy": {
+      "descriptionFields": [
+        "name",
+        "group.name"
+      ],
+      "document": "User",
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Created by",
+        "pt_BR": "Criado por"
+      },
+      "name": "_createdBy",
+      "type": "lookup"
+    },
+    "_updatedAt": {
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Updated At",
+        "pt_BR": "Atualizado em"
+      },
+      "name": "_updatedAt",
+      "type": "dateTime"
+    },
+    "_updatedBy": {
+      "descriptionFields": [
+        "name",
+        "group.name"
+      ],
+      "document": "User",
+      "isInherited": true,
+      "label": {
+        "en": "Updated by",
+        "pt_BR": "Atualizado por"
+      },
+      "name": "_updatedBy",
+      "type": "lookup"
+    },
+    "active": {
+      "defaultValue": true,
+      "isInherited": true,
+      "isRequired": true,
+      "isSortable": true,
+      "label": {
+        "en": "Active",
+        "pt_BR": "Ativo"
+      },
+      "name": "active",
+      "type": "boolean"
+    },
+    "code": {
+      "isInherited": true,
+      "isSortable": true,
+      "isUnique": true,
+      "label": {
+        "en": "Code",
+        "pt_BR": "Código"
+      },
+      "name": "code",
+      "type": "autoNumber"
+    },
+    "name": {
+      "isInherited": true,
+      "isRequired": true,
+      "isSortable": true,
+      "label": {
+        "en": "Opportunity Name",
+        "pt_BR": "Nome da Oportunidade"
+      },
+      "name": "name",
+      "type": "text"
+    },
+    "contact": {
+      "document": "Contact",
+      "descriptionFields": [
+        "code",
+        "name.full"
+      ],
+      "label": {
+        "en": "Contact",
+        "pt_BR": "Contato"
+      },
+      "name": "contact",
+      "type": "lookup",
+      "isRequired": true
+    },
+    "property": {
+      "label": {
+        "en": "Related Property",
+        "pt_BR": "Imóvel Relacionado"
+      },
+      "name": "property",
+      "type": "text"
+    },
+    "leadType": {
+      "label": {
+        "en": "Lead Type",
+        "pt_BR": "Tipo de Lead"
+      },
+      "name": "leadType",
+      "type": "picklist",
+      "options": {
+        "Spot": {
+          "en": "Spot",
+          "pt_BR": "Spot"
+        },
+        "Reentry": {
+          "en": "Reentry",
+          "pt_BR": "Reentrada"
+        },
+        "Reprocessing": {
+          "en": "Reprocessing",
+          "pt_BR": "Reprocessamento"
+        }
+      }
+    },
+    "sourceChannel": {
+      "document": "Channel",
+      "descriptionFields": [
+        "code",
+        "name"
+      ],
+      "label": {
+        "en": "Source Channel",
+        "pt_BR": "Canal de Origem"
+      },
+      "name": "sourceChannel",
+      "type": "lookup"
+    },
+    "distributionQueue": {
+      "document": "Queue",
+      "descriptionFields": [
+        "code",
+        "name"
+      ],
+      "label": {
+        "en": "Distribution roulette",
+        "pt_BR": "Roleta de Distribuição"
+      },
+      "name": "distributionQueue",
+      "type": "lookup"
+    },
+    "initialAssignmentDate": {
+      "label": {
+        "en": "Initial Assignment Date",
+        "pt_BR": "Data de Atribuição Inicial"
+      },
+      "name": "initialAssignmentDate",
+      "type": "dateTime"
+    },
+    "responsible": {
+      "document": "User",
+      "descriptionFields": [
+        "name",
+        "group.name",
+        "office.name",
+        "franchise.name"
+      ],
+      "inheritedFields": [
+        {
+          "fieldName": "group",
+          "inherit": "once"
+        },
+        {
+          "fieldName": "franchise",
+          "inherit": "once"
+        },
+        {
+          "fieldName": "office",
+          "inherit": "once"
+        }
+      ],
+      "label": {
+        "en": "Responsible Broker",
+        "pt_BR": "Corretor Responsável"
+      },
+      "name": "responsible",
+      "type": "lookup"
+    },
+    "status": {
+      "label": {
+        "en": "Status",
+        "pt_BR": "Status"
+      },
+      "name": "status",
+      "type": "picklist",
+      "options": {
+        "New": {
+          "en": "New",
+          "pt_BR": "Novo"
+        },
+        "InProgress": {
+          "en": "In Progress",
+          "pt_BR": "Em Andamento"
+        },
+        "Qualified": {
+          "en": "Qualified",
+          "pt_BR": "Qualificado"
+        },
+        "Closed": {
+          "en": "Closed",
+          "pt_BR": "Fechado"
+        }
+      }
+    },
+    "_user": {
+      "descriptionFields": [
+        "name",
+        "group.name",
+        "active"
+      ],
+      "detailFields": [
+        "phone",
+        "emails"
+      ],
+      "type": "lookup",
+      "name": "_user",
+      "label": {
+        "en": "User",
+        "pt_BR": "Usuário"
+      },
+      "isSortable": true,
+      "isList": true,
+      "document": "User"
+    },
+    "group": {
+      "name": "group",
+      "type": "lookup",
+      "document": "Group",
+      "label": {
+        "en": "Group",
+        "pt_BR": "Grupo"
+      },
+      "descriptionFields": [
+        "code",
+        "name"
+      ]
+    },
+    "office": {
+      "name": "office",
+      "type": "lookup",
+      "document": "Office",
+      "label": {
+        "en": "Office",
+        "pt_BR": "Agência"
+      },
+      "descriptionFields": [
+        "code",
+        "name"
+      ]
+    },
+    "franchise": {
+      "name": "franchise",
+      "type": "lookup",
+      "document": "Franchise",
+      "label": {
+        "en": "Franchise",
+        "pt_BR": "Franquia"
+      },
+      "descriptionFields": [
+        "code",
+        "name"
+      ]
+    },
+    "aiBrief": {
+      "label": {
+        "en": "AI Brief",
+        "pt_BR": "Resumo IA"
+      },
+      "name": "aiBrief",
+      "type": "richText"
+    },
+    "aiNotes": {
+      "label": {
+        "en": "AI Notes",
+        "pt_BR": "Notas IA"
+      },
+      "name": "aiNotes",
+      "type": "richText"
+    },
+    "amount": {
+      "decimalSize": 2,
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Ammount",
+        "pt_BR": "Valor"
+      },
+      "minValue": 0,
+      "name": "amount",
+      "type": "money"
+    },
+    "areaPrivate": {
+      "decimalSize": 3,
+      "isSortable": true,
+      "label": {
+        "en": "Private Area",
+        "pt_BR": "Area Privativa"
+      },
+      "minValue": 0,
+      "name": "areaPrivate",
+      "type": "number"
+    },
+    "campaign": {
+      "descriptionFields": [
+        "code",
+        "name",
+        "type"
+      ],
+      "document": "Campaign",
+      "inheritedFields": [
+        {
+          "fieldName": "development",
+          "inherit": "once"
+        }
+      ],
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Campaign",
+        "pt_BR": "Campanha"
+      },
+      "name": "campaign",
+      "type": "lookup"
+    },
+    "canReprocessAIPPOs": {
+      "label": {
+        "en": "Can Reprocess AIPPOs",
+        "pt_BR": "Pode Reprocessar PPOs da IA"
+      },
+      "name": "canReprocessAIPPOs",
+      "type": "boolean"
+    },
+    "changesHash": {
+      "isSortable": true,
+      "label": {
+        "en": "Changes Hash",
+        "pt_BR": "Hash de Mudanças"
+      },
+      "name": "changesHash",
+      "type": "text"
+    },
+    "development": {
+      "descriptionFields": [
+        "code",
+        "name"
+      ],
+      "document": "Development",
+      "inheritedFields": [
+        {
+          "fieldName": "minSale",
+          "inherit": "once"
+        },
+        {
+          "fieldName": "maxSale",
+          "inherit": "once"
+        },
+        {
+          "fieldName": "inCondominium",
+          "inherit": "once"
+        },
+        {
+          "fieldName": "minAreaPrivate",
+          "inherit": "once"
+        },
+        {
+          "fieldName": "maxAreaPrivate",
+          "inherit": "once"
+        },
+        {
+          "fieldName": "minBedrooms",
+          "inherit": "once"
+        },
+        {
+          "fieldName": "maxBedrooms",
+          "inherit": "once"
+        },
+        {
+          "fieldName": "minParkingSpaces",
+          "inherit": "once"
+        },
+        {
+          "fieldName": "maxParkingSpaces",
+          "inherit": "once"
+        }
+      ],
+      "isSortable": true,
+      "label": {
+        "en": "Development",
+        "pt_BR": "Empreendimento"
+      },
+      "name": "development",
+      "type": "lookup"
+    },
+    "discardReason": {
+      "isSortable": true,
+      "label": {
+        "en": "Reason for Discard",
+        "pt_BR": "Motivo Descarte"
+      },
+      "maxSelected": 1,
+      "minSelected": 0,
+      "name": "discardReason",
+      "options": {
+        "Cliente já comprou concorrente": {
+          "en": "Customer already bought from competitor",
+          "pt_BR": "Cliente já comprou concorrente",
+          "sort": 60
+        },
+        "Cliente já comprou outro corretor": {
+          "en": "Customer already bought with another broker",
+          "pt_BR": "Cliente já comprou outro corretor",
+          "sort": 70
+        },
+        "Cliente sem condições financeiras": {
+          "en": "Not enought money",
+          "pt_BR": "Cliente sem condições financeiras",
+          "sort": 10
+        },
+        "Cliente sem previsão de compra": {
+          "en": "Customer without purchase forecast",
+          "pt_BR": "Cliente sem previsão de compra",
+          "sort": 40
+        },
+        "Em atendimento por outro corretor": {
+          "en": "In service with another broker",
+          "pt_BR": "Em atendimento por outro corretor",
+          "sort": 50
+        },
+        "Imóvel fora de atuação corretor": {
+          "en": "Property outside broker's zone",
+          "pt_BR": "Imóvel fora de atuação corretor",
+          "sort": 20
+        },
+        "Não consegue contato / retorno": {
+          "en": "Can't contact",
+          "pt_BR": "Não consegue contato / retorno",
+          "sort": 30
+        }
+      },
+      "optionsSorter": "sort",
+      "renderAs": "with_scroll",
+      "type": "picklist"
+    },
+    "externalCode": {
+      "isSortable": true,
+      "label": {
+        "en": "External Code",
+        "pt_BR": "Código Externo"
+      },
+      "name": "externalCode",
+      "type": "text"
+    },
+    "filterPurpose": {
+      "isSortable": true,
+      "label": {
+        "en": "Purpose",
+        "pt_BR": "Finalidade"
+      },
+      "maxSelected": 2,
+      "minSelected": 0,
+      "name": "filterPurpose",
+      "options": {
+        "Comercial": {
+          "pt_BR": "Comercial"
+        },
+        "Residencial": {
+          "pt_BR": "Residencial"
+        }
+      },
+      "optionsSorter": "asc",
+      "renderAs": "without_scroll",
+      "type": "picklist"
+    },
+    "filterType": {
+      "isSortable": true,
+      "label": {
+        "en": "Product Type",
+        "pt_BR": "Tipo de Imóvel"
+      },
+      "maxSelected": 10,
+      "minSelected": 0,
+      "name": "filterType",
+      "options": {
+        "Apartamento": {
+          "pt_BR": "Apartamento",
+          "sort": 1
+        },
+        "Apartamento Garden": {
+          "pt_BR": "Apartamento Garden",
+          "sort": 2
+        },
+        "Box / Garagem": {
+          "pt_BR": "Box / Garagem",
+          "sort": 3
+        },
+        "Casa": {
+          "pt_BR": "Casa",
+          "sort": 4
+        },
+        "Casa em Condomínio": {
+          "pt_BR": "Casa em Condomínio",
+          "sort": 5
+        },
+        "Cobertura": {
+          "pt_BR": "Cobertura",
+          "sort": 6
+        },
+        "Edifício Inteiro": {
+          "pt_BR": "Edifício Inteiro",
+          "sort": 7
+        },
+        "Fazenda / Sítio / Chácara": {
+          "pt_BR": "Fazenda / Sítio / Chácara",
+          "sort": 8
+        },
+        "Flat": {
+          "pt_BR": "Flat",
+          "sort": 9
+        },
+        "Fração Imobiliária": {
+          "pt_BR": "Fração Imobiliária",
+          "sort": 10
+        },
+        "Galpão / Depósito / Armazém / Pavilhão": {
+          "pt_BR": "Galpão / Depósito / Armazém / Pavilhão",
+          "sort": 11
+        },
+        "Hotel / Motel / Pousada": {
+          "pt_BR": "Hotel / Motel / Pousada",
+          "sort": 12
+        },
+        "Kitnet / JK / Studio": {
+          "pt_BR": "Kitnet / JK / Studio",
+          "sort": 13
+        },
+        "Loft": {
+          "pt_BR": "Loft",
+          "sort": 14
+        },
+        "Loja": {
+          "pt_BR": "Loja",
+          "sort": 15
+        },
+        "Sala / Conjunto Comercial": {
+          "pt_BR": "Sala / Conjunto Comercial",
+          "sort": 16
+        },
+        "Terreno": {
+          "pt_BR": "Terreno",
+          "sort": 17
+        },
+        "Terreno em Condomínio": {
+          "pt_BR": "Terreno em Condomínio",
+          "sort": 18
+        }
+      },
+      "optionsSorter": "asc",
+      "renderAs": "without_scroll",
+      "type": "picklist"
+    },
+    "financing": {
+      "label": {
+        "en": "Financing",
+        "pt_BR": "Financiamento"
+      },
+      "name": "financing",
+      "type": "boolean"
+    },
+    "hasError": {
+      "label": {
+        "en": "Has error",
+        "pt_BR": "Tem erro"
+      },
+      "name": "hasError",
+      "type": "boolean"
+    },
+    "inCondominium": {
+      "label": {
+        "en": "In Condominium",
+        "pt_BR": "Em Condomínio"
+      },
+      "name": "inCondominium",
+      "type": "boolean"
+    },
+    "interviewKnownFacts": {
+      "isList": true,
+      "label": {
+        "en": "Interview Known Facts",
+        "pt_BR": "O que já sabemos"
+      },
+      "name": "interviewKnownFacts",
+      "type": "text"
+    },
+    "interviewLastInteractionAt": {
+      "label": {
+        "en": "Interview Last Interaction At",
+        "pt_BR": "Última interação (Entrevista)"
+      },
+      "name": "interviewLastInteractionAt",
+      "type": "dateTime"
+    },
+    "interviewLastSummary": {
+      "label": {
+        "en": "Interview Last Summary",
+        "pt_BR": "Resumo IA (último)"
+      },
+      "name": "interviewLastSummary",
+      "type": "richText"
+    },
+    "interviewProfileQuestionsJson": {
+      "label": {
+        "en": "Interview Profile Questions (JSON)",
+        "pt_BR": "Perguntas do Perfil (JSON)"
+      },
+      "name": "interviewProfileQuestionsJson",
+      "type": "text"
+    },
+    "interviewProfileQuestionsMd": {
+      "label": {
+        "en": "Interview Profile Questions (Markdown)",
+        "pt_BR": "Perguntas do Perfil (Markdown)"
+      },
+      "name": "interviewProfileQuestionsMd",
+      "type": "richText"
+    },
+    "interviewProgressPercent": {
+      "isSortable": true,
+      "label": {
+        "en": "Interview Progress (%)",
+        "pt_BR": "Progresso da Entrevista (%)"
+      },
+      "maxValue": 100,
+      "minValue": 0,
+      "name": "interviewProgressPercent",
+      "type": "number"
+    },
+    "interviewStatus": {
+      "label": {
+        "en": "Interview Status",
+        "pt_BR": "Status da Entrevista"
+      },
+      "name": "interviewStatus",
+      "options": {
+        "completed": {
+          "en": "Completed",
+          "pt_BR": "Concluída"
+        },
+        "in_progress": {
+          "en": "In Progress",
+          "pt_BR": "Em andamento"
+        },
+        "not_started": {
+          "en": "Not Started",
+          "pt_BR": "Não iniciada"
+        },
+        "paused": {
+          "en": "Paused",
+          "pt_BR": "Pausada"
+        }
+      },
+      "optionsSorter": "asc",
+      "renderAs": "without_scroll",
+      "type": "picklist"
+    },
+    "interviewTags": {
+      "isList": true,
+      "label": {
+        "en": "Interview Tags",
+        "pt_BR": "Tags da Entrevista"
+      },
+      "name": "interviewTags",
+      "type": "text"
+    },
+    "isRescued": {
+      "defaultValue": false,
+      "label": {
+        "en": "Is Rescued",
+        "pt_BR": "Resgatada"
+      },
+      "name": "isRescued",
+      "type": "boolean"
+    },
+    "label": {
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Label",
+        "pt_BR": "Título"
+      },
+      "name": "label",
+      "type": "text"
+    },
+    "lastRelevantUpdate": {
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Last Relevant Update",
+        "pt_BR": "Última atualização de Interesses"
+      },
+      "name": "lastRelevantUpdate",
+      "readOnlyVersion": true,
+      "type": "date"
+    },
+    "leadFlowControl": {
+      "label": {
+        "en": "Lead Flow Control",
+        "pt_BR": "Controle do Lead Flow"
+      },
+      "name": "leadFlowControl",
+      "type": "json"
+    },
+    "lookingFor": {
+      "document": "Product",
+      "filterableFields": [
+        "active",
+        "_createdAt",
+        "_createdBy",
+        "description",
+        "code",
+        "type",
+        "name",
+        "sku",
+        "_user"
+      ],
+      "isInherited": true,
+      "label": {
+        "en": "Looking for",
+        "pt_BR": "Filtros da Pesquisa"
+      },
+      "name": "lookingFor",
+      "relations": [
+        {
+          "document": "ProductsPerOpportunities",
+          "lookup": "product",
+          "reverseLookup": "opportunity"
+        },
+        {
+          "document": "ProductsPerOpportunities",
+          "email": true,
+          "emailConf": {
+            "contact": "Opportunity[0].contact",
+            "extraData": {
+              "banner": {
+                "document": "WebElement",
+                "filter": {
+                  "conditions": [
+                    {
+                      "operator": "equals",
+                      "term": "type",
+                      "value": "Email Ofertas - Cabeçalho"
+                    },
+                    {
+                      "operator": "equals",
+                      "term": "status",
+                      "value": "Ativo"
+                    },
+                    {
+                      "operator": "less_or_equals",
+                      "term": "startAt",
+                      "value": "$now"
+                    },
+                    {
+                      "operator": "greater_or_equals",
+                      "term": "endAt",
+                      "value": "$now"
+                    }
+                  ],
+                  "match": "and"
+                }
+              },
+              "rodape": {
+                "document": "WebElement",
+                "filter": {
+                  "conditions": [
+                    {
+                      "operator": "equals",
+                      "term": "type",
+                      "value": "Email Ofertas - Rodapé"
+                    },
+                    {
+                      "operator": "equals",
+                      "term": "status",
+                      "value": "Ativo"
+                    },
+                    {
+                      "operator": "less_or_equals",
+                      "term": "startAt",
+                      "value": "$now"
+                    },
+                    {
+                      "operator": "greater_or_equals",
+                      "term": "endAt",
+                      "value": "$now"
+                    }
+                  ],
+                  "match": "and"
+                }
+              }
+            },
+            "opportunity": "Opportunity[0]",
+            "server": "googleApp",
+            "template": "k3dGCfa8rcGujK8p9"
+          },
+          "label": {
+            "pt_BR": "Produto Ofertado (enviar por email/WhatsApp)"
+          },
+          "lookup": "product",
+          "reverseLookup": "opportunity",
+          "view": "Email"
+        }
+      ],
+      "type": "filter"
+    },
+    "maxAreaPrivate": {
+      "decimalSize": 3,
+      "label": {
+        "en": "Max Private Area",
+        "pt_BR": "Máx. Area Privativa"
+      },
+      "minValue": 0,
+      "name": "maxAreaPrivate",
+      "type": "number"
+    },
+    "maxBedrooms": {
+      "label": {
+        "en": "Max Bedrooms",
+        "pt_BR": "Máx. Dormitórios"
+      },
+      "minValue": 0,
+      "name": "maxBedrooms",
+      "type": "number"
+    },
+    "maxParkingSpaces": {
+      "label": {
+        "en": "Max Parking Spaces",
+        "pt_BR": "Máx. Vagas Total"
+      },
+      "minValue": 0,
+      "name": "maxParkingSpaces",
+      "type": "number"
+    },
+    "maxSale": {
+      "decimalSize": 2,
+      "label": {
+        "en": "Max Sale",
+        "pt_BR": "Máx. Valor de Venda"
+      },
+      "minValue": 0,
+      "name": "maxSale",
+      "type": "money"
+    },
+    "migrationRawData": {
+      "label": {
+        "en": "Migration Raw Data",
+        "pt_BR": "Dados Brutos da Migração"
+      },
+      "name": "migrationRawData",
+      "type": "json"
+    },
+    "minAreaPrivate": {
+      "decimalSize": 3,
+      "label": {
+        "en": "Min Private Area",
+        "pt_BR": "Mín. Area Privativa"
+      },
+      "minValue": 0,
+      "name": "minAreaPrivate",
+      "type": "number"
+    },
+    "minBedrooms": {
+      "label": {
+        "en": "Min Bedrooms",
+        "pt_BR": "Mín. Dormitórios"
+      },
+      "minValue": 0,
+      "name": "minBedrooms",
+      "type": "number"
+    },
+    "minParkingSpaces": {
+      "label": {
+        "en": "Min Parking Spaces",
+        "pt_BR": "Mín. Vagas Total"
+      },
+      "minValue": 0,
+      "name": "minParkingSpaces",
+      "type": "number"
+    },
+    "minSale": {
+      "decimalSize": 2,
+      "label": {
+        "en": "Min Sale",
+        "pt_BR": "Mín. Valor de Venda"
+      },
+      "minValue": 0,
+      "name": "minSale",
+      "type": "money"
+    },
+    "nextActivityAt": {
+      "isSortable": true,
+      "label": {
+        "en": "Next Activity At",
+        "pt_BR": "Próxima Atividade em"
+      },
+      "minValue": 0,
+      "name": "nextActivityAt",
+      "type": "dateTime"
+    },
+    "nextStep": {
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Next Step",
+        "pt_BR": "Proximo Passo"
+      },
+      "maxSelected": 1,
+      "minSelected": 0,
+      "name": "nextStep",
+      "options": {
+        "Agendar visita": {
+          "en": "Schedule visit",
+          "pt_BR": "Agendar visita",
+          "sort": 5
+        },
+        "Aguardar proposta": {
+          "en": "Await proposal",
+          "pt_BR": "Aguardar proposta",
+          "sort": 9
+        },
+        "Assinar contrato": {
+          "en": "Sign contract",
+          "pt_BR": "Assinar contrato",
+          "sort": 12
+        },
+        "Cobrar retorno do proprietário sobre a proposta": {
+          "en": "Demand owner return on the proposal",
+          "pt_BR": "Cobrar retorno do proprietário sobre a proposta",
+          "sort": 10
+        },
+        "Entrar em contato": {
+          "en": "Get it touch",
+          "pt_BR": "Entrar em contato",
+          "sort": 2
+        },
+        "Fazer simulação de financiamento": {
+          "en": "Make simulation of financing",
+          "pt_BR": "Fazer simulação de financiamento",
+          "sort": 15
+        },
+        "Ofertar novos imóveis": {
+          "en": "Offer new products",
+          "pt_BR": "Ofertar novos imóveis",
+          "sort": 3
+        },
+        "Pegar Feedback da visita": {
+          "en": "Get the visit feedback",
+          "pt_BR": "Pegar Feedback da visita",
+          "sort": 7
+        },
+        "Pegar Feedback dos imóveis ofertados e agendar visita": {
+          "en": "Get the offered products feedback and schedule visit",
+          "pt_BR": "Pegar Feedback dos imóveis ofertados e agendar visita",
+          "sort": 4
+        },
+        "Pesquisar Procob": {
+          "en": "Research Procob",
+          "pt_BR": "Pesquisar Procob",
+          "sort": 13
+        },
+        "Primeiro contato": {
+          "en": "First contact",
+          "pt_BR": "Primeiro contato",
+          "sort": 1
+        },
+        "Realizar Visita": {
+          "en": "Make the visit",
+          "pt_BR": "Realizar Visita",
+          "sort": 6
+        },
+        "Realizar reunião com interessados": {
+          "en": "Hold a meeting with the interested",
+          "pt_BR": "Realizar reunião com interessados",
+          "sort": 11
+        },
+        "Solicitar proposta": {
+          "en": "Request proposal",
+          "pt_BR": "Solicitar proposta",
+          "sort": 8
+        },
+        "Vender imóvel do cliente": {
+          "en": "Sell product to client",
+          "pt_BR": "Vender imóvel do cliente",
+          "sort": 14
+        }
+      },
+      "optionsSorter": "sort",
+      "renderAs": "without_scroll",
+      "type": "picklist"
+    },
+    "notes": {
+      "isInherited": true,
+      "label": {
+        "en": "Notes",
+        "pt_BR": "Observação"
+      },
+      "name": "notes",
+      "type": "text"
+    },
+    "ocupacao_investimento": {
+      "label": {
+        "en": "Occupation/Investment",
+        "pt_BR": "Ocupação/Investimento"
+      },
+      "name": "ocupacao_investimento",
+      "type": "text"
+    },
+    "origin": {
+      "label": {
+        "en": "Origin",
+        "pt_BR": "Origem"
+      },
+      "name": "origin",
+      "type": "text"
+    },
+    "phase": {
+      "isSortable": true,
+      "label": {
+        "en": "Phase",
+        "pt_BR": "Fase"
+      },
+      "maxSelected": 1,
+      "minSelected": 0,
+      "name": "phase",
+      "options": {
+        "Encerramento": {
+          "en": "Conclusion",
+          "pt_BR": "Encerramento",
+          "sort": 8
+        },
+        "Fechamento": {
+          "en": "Closing",
+          "pt_BR": "Fechamento",
+          "sort": 6
+        },
+        "Lead": {
+          "en": "Lead",
+          "pt_BR": "Lead",
+          "sort": 1
+        },
+        "Matching": {
+          "en": "Matching",
+          "pt_BR": "Matching",
+          "sort": 3
+        },
+        "Negociação": {
+          "en": "Negotiation",
+          "pt_BR": "Negociação",
+          "sort": 5
+        },
+        "Pós-venda": {
+          "en": "After Sales",
+          "pt_BR": "Pós-venda",
+          "sort": 7
+        },
+        "Qualificação": {
+          "en": "Qualification",
+          "pt_BR": "Qualificação",
+          "sort": 2
+        },
+        "Visitas": {
+          "en": "Visits",
+          "pt_BR": "Visitas",
+          "sort": 4
+        }
+      },
+      "optionsSorter": "sort",
+      "renderAs": "without_scroll",
+      "type": "picklist"
+    },
+    "priority": {
+      "decimalSize": 0,
+      "label": {
+        "en": "Priority",
+        "pt_BR": "Prioridade"
+      },
+      "minValue": 0,
+      "name": "priority",
+      "type": "number"
+    },
+    "probability": {
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Sale Probability",
+        "pt_BR": "Probabilidade de Venda"
+      },
+      "maxSelected": 1,
+      "minSelected": 0,
+      "name": "probability",
+      "options": {
+        "10": {
+          "en": "10",
+          "pt_BR": "10"
+        },
+        "30": {
+          "en": "30",
+          "pt_BR": "30"
+        },
+        "50": {
+          "en": "50",
+          "pt_BR": "50"
+        },
+        "70": {
+          "en": "70",
+          "pt_BR": "70"
+        },
+        "90": {
+          "en": "90",
+          "pt_BR": "90"
+        }
+      },
+      "optionsSorter": "asc",
+      "renderAs": "without_scroll",
+      "type": "picklist"
+    },
+    "productBroker": {
+      "descriptionFields": [
+        "code",
+        "type",
+        "sale",
+        "address"
+      ],
+      "document": "Product",
+      "inheritedFields": [
+        {
+          "fieldName": "saleTarget",
+          "inherit": "once"
+        },
+        {
+          "fieldName": "areaPrivate",
+          "inherit": "once"
+        }
+      ],
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "productBroker",
+        "pt_BR": "Imóvel Agenciado"
+      },
+      "name": "productBroker",
+      "type": "lookup"
+    },
+    "proposalDate": {
+      "label": {
+        "en": "Proposal Date",
+        "pt_BR": "Data da Proposta"
+      },
+      "name": "proposalDate",
+      "type": "dateTime"
+    },
+    "prospectingRescuedAt": {
+      "label": {
+        "en": "Rescued At",
+        "pt_BR": "Resgatada em (Prospecção)"
+      },
+      "name": "prospectingRescuedAt",
+      "type": "dateTime"
+    },
+    "purchaseForecast": {
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Purchase Forecast",
+        "pt_BR": "Previsão de Compra"
+      },
+      "name": "purchaseForecast",
+      "type": "date"
+    },
+    "queue": {
+      "descriptionFields": [
+        "name"
+      ],
+      "document": "Queue",
+      "isInherited": true,
+      "label": {
+        "en": "Queue",
+        "pt_BR": "Roleta"
+      },
+      "name": "queue",
+      "type": "lookup"
+    },
+    "rescuedFrom": {
+      "descriptionFields": [
+        "code",
+        "_user.name"
+      ],
+      "document": "Opportunity",
+      "label": {
+        "en": "Rescued from",
+        "pt_BR": "Resgatada de"
+      },
+      "name": "rescuedFrom",
+      "type": "lookup"
+    },
+    "searchReason": {
+      "label": {
+        "en": "Search Reason",
+        "pt_BR": "Motivo da Busca"
+      },
+      "name": "searchReason",
+      "type": "text"
+    },
+    "sellingTemperature": {
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Selling temperature",
+        "pt_BR": "Temperatura de venda"
+      },
+      "maxSelected": 1,
+      "minSelected": 0,
+      "name": "sellingTemperature",
+      "options": {
+        "Frio": {
+          "en": "Cold",
+          "pt_BR": "Frio"
+        },
+        "Morno": {
+          "en": "Lukewarm",
+          "pt_BR": "Morno"
+        },
+        "Quente": {
+          "en": "Hot",
+          "pt_BR": "Quente"
+        }
+      },
+      "optionsSorter": "sort",
+      "renderAs": "without_scroll",
+      "type": "picklist"
+    },
+    "subPhase": {
+      "isSortable": true,
+      "label": {
+        "en": "Sub Phase",
+        "pt_BR": "Sub-Fase"
+      },
+      "maxSelected": 1,
+      "minSelected": 0,
+      "name": "subPhase",
+      "options": {
+        "Contato realizado": {
+          "en": "Contact Made",
+          "pt_BR": "Contato realizado",
+          "sort": 21
+        },
+        "Contrato assinado": {
+          "en": "Contract Signed",
+          "pt_BR": "Contrato assinado",
+          "sort": 62
+        },
+        "Documentação/financiamento": {
+          "en": "Documentation/Financing",
+          "pt_BR": "Documentação/financiamento",
+          "sort": 61
+        },
+        "Escritura/entrega": {
+          "en": "Deed/Delivery",
+          "pt_BR": "Escritura/entrega",
+          "sort": 63
+        },
+        "Follow-up oferta imóveis": {
+          "en": "Follow-up Property Offer",
+          "pt_BR": "Follow-up oferta imóveis",
+          "sort": 33
+        },
+        "Interesse confirmado": {
+          "en": "Interest Confirmed",
+          "pt_BR": "Interesse confirmado",
+          "sort": 32
+        },
+        "Lead adormecido": {
+          "en": "Dormant Lead",
+          "pt_BR": "Lead adormecido",
+          "sort": 82
+        },
+        "Nova": {
+          "en": "New",
+          "pt_BR": "Nova",
+          "sort": 11
+        },
+        "Ofertando imóveis": {
+          "en": "Offering Properties",
+          "pt_BR": "Ofertando imóveis",
+          "sort": 31
+        },
+        "Perdido": {
+          "en": "Lost",
+          "pt_BR": "Perdido",
+          "sort": 81
+        },
+        "Perfil definido": {
+          "en": "Profile Defined",
+          "pt_BR": "Perfil definido",
+          "sort": 22
+        },
+        "Proposta aceita": {
+          "en": "Proposal Accepted",
+          "pt_BR": "Proposta aceita",
+          "sort": 53
+        },
+        "Proposta em discussão": {
+          "en": "Proposal in Discussion",
+          "pt_BR": "Proposta em discussão",
+          "sort": 51
+        },
+        "Proposta formalizada": {
+          "en": "Proposal Formalized",
+          "pt_BR": "Proposta formalizada",
+          "sort": 52
+        },
+        "Pós-venda ativo": {
+          "en": "Active After Sales",
+          "pt_BR": "Pós-venda ativo",
+          "sort": 71
+        },
+        "Solicitação de visita": {
+          "en": "Visit Request",
+          "pt_BR": "Solicitação de visita",
+          "sort": 40
+        },
+        "Tentando contato - dia 1": {
+          "en": "Trying Contact - Day 1",
+          "pt_BR": "Tentando contato - dia 1",
+          "sort": 12
+        },
+        "Tentando contato - dia 2": {
+          "en": "Trying Contact - Day 2",
+          "pt_BR": "Tentando contato - dia 2",
+          "sort": 13
+        },
+        "Tentando contato - dias 3-7": {
+          "en": "Trying Contact - Days 3-7",
+          "pt_BR": "Tentando contato - dias 3-7",
+          "sort": 14
+        },
+        "Visita agendada": {
+          "en": "Visit Scheduled",
+          "pt_BR": "Visita agendada",
+          "sort": 41
+        },
+        "Visita cancelada": {
+          "en": "Visit Cancelled",
+          "pt_BR": "Visita cancelada",
+          "sort": 45
+        },
+        "Visita com interesse": {
+          "en": "Visit with Interest",
+          "pt_BR": "Visita com interesse",
+          "sort": 46
+        },
+        "Visita confirmada": {
+          "en": "Visit Confirmed",
+          "pt_BR": "Visita confirmada",
+          "sort": 42
+        },
+        "Visita realizada": {
+          "en": "Visit Completed",
+          "pt_BR": "Visita realizada",
+          "sort": 44
+        },
+        "Cliente resgatado": {
+          "en": "Rescued client",
+          "pt_BR": "Cliente resgatado",
+          "sort": 15
+        },
+        "Tentativa 1": {
+          "en": "Attempt 1",
+          "pt_BR": "Tentativa 1",
+          "sort": 17
+        },
+        "Tentativa 2": {
+          "en": "Attempt 2",
+          "pt_BR": "Tentativa 2",
+          "sort": 18
+        },
+        "Tentativa 3": {
+          "en": "Attempt 3",
+          "pt_BR": "Tentativa 3",
+          "sort": 19
+        },
+        "Aguardando confirmação": {
+          "en": "Awaiting Confirmation",
+          "pt_BR": "Aguardando confirmação",
+          "sort": 43
+        },
+        "Na fila do imóvel": {
+          "en": "In Property Queue",
+          "pt_BR": "Na fila do imóvel",
+          "sort": 54
+        },
+        "Enviada ao proprietário": {
+          "en": "Sent to Owner",
+          "pt_BR": "Enviada ao proprietário",
+          "sort": 55
+        },
+        "Contrato em elaboração": {
+          "en": "Contract Being Drafted",
+          "pt_BR": "Contrato em elaboração",
+          "sort": 64
+        },
+        "Em assinatura": {
+          "en": "Awaiting Signature",
+          "pt_BR": "Em assinatura",
+          "sort": 65
+        },
+        "Lead a descartar": {
+          "en": "Lead to Discard",
+          "pt_BR": "Lead a descartar",
+          "sort": 84
+        }
+      },
+      "optionsSorter": "sort",
+      "renderAs": "with_scroll",
+      "type": "picklist"
+    },
+    "subPhaseStatus": {
+      "isSortable": true,
+      "label": {
+        "en": "Sub Phase Status",
+        "pt_BR": "Status da Sub-Fase"
+      },
+      "maxSelected": 1,
+      "minSelected": 0,
+      "name": "subPhaseStatus",
+      "options": {
+        "ALM identificado": {
+          "en": "ALM identified",
+          "pt_BR": "ALM identificado",
+          "sort": 221
+        },
+        "Acompanhando contratual": {
+          "en": "Following contract",
+          "pt_BR": "Acompanhando contratual",
+          "sort": 612
+        },
+        "Agendando assinatura": {
+          "en": "Scheduling signature",
+          "pt_BR": "Agendando assinatura",
+          "sort": 621
+        },
+        "Agendando visita": {
+          "en": "Scheduling visit",
+          "pt_BR": "Agendando visita",
+          "sort": 411
+        },
+        "Aguardando 3 meses para pop-by": {
+          "en": "Awaiting 3 months for pop-by",
+          "pt_BR": "Aguardando 3 meses para pop-by",
+          "sort": 634
+        },
+        "Aguardando agendamento": {
+          "en": "Awaiting scheduling",
+          "pt_BR": "Aguardando agendamento",
+          "sort": 402
+        },
+        "Aguardando assinatura": {
+          "en": "Awaiting signature",
+          "pt_BR": "Aguardando assinatura",
+          "sort": 623
+        },
+        "Aguardando confirmação das partes": {
+          "en": "Awaiting confirmation from parties",
+          "pt_BR": "Aguardando confirmação das partes",
+          "sort": 414
+        },
+        "Aguardando documentação": {
+          "en": "Awaiting documentation",
+          "pt_BR": "Aguardando documentação",
+          "sort": 613
+        },
+        "Aguardando envio de lembrete (4 horas antes)": {
+          "en": "Awaiting reminder send (4 hours before)",
+          "pt_BR": "Aguardando envio de lembrete (4 horas antes)",
+          "sort": 422
+        },
+        "Aguardando finalização": {
+          "en": "Awaiting completion",
+          "pt_BR": "Aguardando finalização",
+          "sort": 125
+        },
+        "Aguardando mensagem de apresentação": {
+          "en": "Waiting for introduction message",
+          "pt_BR": "Aguardando mensagem de apresentação",
+          "sort": 114
+        },
+        "Aguardando primeiro acompanhamento": {
+          "en": "Awaiting first follow-up",
+          "pt_BR": "Aguardando primeiro acompanhamento",
+          "sort": 523
+        },
+        "Aguardando resposta automática": {
+          "en": "Waiting for automatic response",
+          "pt_BR": "Aguardando resposta automática",
+          "sort": 111
+        },
+        "Aguardando resposta proposta": {
+          "en": "Awaiting proposal response",
+          "pt_BR": "Aguardando resposta proposta",
+          "sort": 532
+        },
+        "Aguardando validação comprador": {
+          "en": "Awaiting buyer validation",
+          "pt_BR": "Aguardando validação comprador",
+          "sort": 514
+        },
+        "Anotando dores e necessidades": {
+          "en": "Noting pains and needs",
+          "pt_BR": "Anotando dores e necessidades",
+          "sort": 214
+        },
+        "Aplicando Rapport": {
+          "en": "Applying Rapport",
+          "pt_BR": "Aplicando Rapport",
+          "sort": 212
+        },
+        "Assinatura agendada": {
+          "en": "Signature scheduled",
+          "pt_BR": "Assinatura agendada",
+          "sort": 622
+        },
+        "Assinatura realizada": {
+          "en": "Signature completed",
+          "pt_BR": "Assinatura realizada",
+          "sort": 624
+        },
+        "Avaliando próximo passo": {
+          "en": "Evaluating next step",
+          "pt_BR": "Avaliando próximo passo",
+          "sort": 444
+        },
+        "Buyer Guide explicado": {
+          "en": "Buyer Guide explained",
+          "pt_BR": "Buyer Guide explicado",
+          "sort": 225
+        },
+        "Celebrando e mantendo relacionamento": {
+          "en": "Celebrating and maintaining relationship",
+          "pt_BR": "Celebrando e mantendo relacionamento",
+          "sort": 631
+        },
+        "Check-in 30 dias realizado": {
+          "en": "30-day check-in completed",
+          "pt_BR": "Check-in 30 dias realizado",
+          "sort": 712
+        },
+        "Check-in realizado (app)": {
+          "en": "Check-in completed (app)",
+          "pt_BR": "Check-in realizado (app)",
+          "sort": 441
+        },
+        "Clique em imóvel detectado": {
+          "en": "Property click detected",
+          "pt_BR": "Clique em imóvel detectado",
+          "sort": 321
+        },
+        "Confirmação final recebida": {
+          "en": "Final confirmation received",
+          "pt_BR": "Confirmação final recebida",
+          "sort": 432
+        },
+        "Confirmação inicial enviada (WhatsApp/Email com ICS)": {
+          "en": "Initial confirmation sent (WhatsApp/Email with ICS)",
+          "pt_BR": "Confirmação inicial enviada (WhatsApp/Email com ICS)",
+          "sort": 413
+        },
+        "Confirmação inicial recebida de todas as partes": {
+          "en": "Initial confirmation received from all parties",
+          "pt_BR": "Confirmação inicial recebida de todas as partes",
+          "sort": 421
+        },
+        "Consulta agendada": {
+          "en": "Consultation scheduled",
+          "pt_BR": "Consulta agendada",
+          "sort": 215
+        },
+        "Consulta em andamento": {
+          "en": "Consultation in progress",
+          "pt_BR": "Consulta em andamento",
+          "sort": 216
+        },
+        "Corretor confirmando disponibilidade": {
+          "en": "Broker confirming availability",
+          "pt_BR": "Corretor confirmando disponibilidade",
+          "sort": 403
+        },
+        "Documentação completa": {
+          "en": "Complete documentation",
+          "pt_BR": "Documentação completa",
+          "sort": 614
+        },
+        "Documentos aceitos": {
+          "en": "Documents accepted",
+          "pt_BR": "Documentos aceitos",
+          "sort": 317
+        },
+        "Documentos explicados": {
+          "en": "Documents explained",
+          "pt_BR": "Documentos explicados",
+          "sort": 226
+        },
+        "Elaborando proposta": {
+          "en": "Preparing proposal",
+          "pt_BR": "Elaborando proposta",
+          "sort": 511
+        },
+        "Em acompanhamento (a cada 2 dias)": {
+          "en": "In follow-up (every 2 days)",
+          "pt_BR": "Em acompanhamento (a cada 2 dias)",
+          "sort": 524
+        },
+        "Em envios semanais": {
+          "en": "In weekly sends",
+          "pt_BR": "Em envios semanais",
+          "sort": 315
+        },
+        "Em tentativas diárias": {
+          "en": "In daily attempts",
+          "pt_BR": "Em tentativas diárias",
+          "sort": 124
+        },
+        "Email 1 pós-escritura enviado": {
+          "en": "Email 1 post-deed sent",
+          "pt_BR": "Email 1 pós-escritura enviado",
+          "sort": 632
+        },
+        "Email 2 pós-escritura enviado": {
+          "en": "Email 2 post-deed sent",
+          "pt_BR": "Email 2 pós-escritura enviado",
+          "sort": 633
+        },
+        "Emails pós-consulta enviados": {
+          "en": "Post-consultation emails sent",
+          "pt_BR": "Emails pós-consulta enviados",
+          "sort": 316
+        },
+        "Filtros de busca configurados": {
+          "en": "Search filters configured",
+          "pt_BR": "Filtros de busca configurados",
+          "sort": 227
+        },
+        "Formalizando ao vendedor": {
+          "en": "Formalizing to seller",
+          "pt_BR": "Formalizando ao vendedor",
+          "sort": 522
+        },
+        "Formulário de proposta preenchido": {
+          "en": "Proposal form filled",
+          "pt_BR": "Formulário de proposta preenchido",
+          "sort": 512
+        },
+        "Google Maps analisado": {
+          "en": "Google Maps analyzed",
+          "pt_BR": "Google Maps analisado",
+          "sort": 217
+        },
+        "Homework definido": {
+          "en": "Homework defined",
+          "pt_BR": "Homework definido",
+          "sort": 228
+        },
+        "Identificando ALM": {
+          "en": "Identifying ALM",
+          "pt_BR": "Identificando ALM",
+          "sort": 213
+        },
+        "Iniciando fechamento": {
+          "en": "Starting closing",
+          "pt_BR": "Iniciando fechamento",
+          "sort": 611
+        },
+        "Iniciando qualificação": {
+          "en": "Starting qualification",
+          "pt_BR": "Iniciando qualificação",
+          "sort": 211
+        },
+        "Intake form enviado": {
+          "en": "Intake form sent",
+          "pt_BR": "Intake form enviado",
+          "sort": 113
+        },
+        "Interesse confirmado pelo corretor": {
+          "en": "Interest confirmed by broker",
+          "pt_BR": "Interesse confirmado pelo corretor",
+          "sort": 323
+        },
+        "Interesse em proposta": {
+          "en": "Interest in proposal",
+          "pt_BR": "Interesse em proposta",
+          "sort": 445
+        },
+        "Lead descartado pelo corretor": {
+          "en": "Lead discarded by broker",
+          "pt_BR": "Lead descartado pelo corretor",
+          "sort": 126
+        },
+        "Lead qualificado": {
+          "en": "Lead qualified",
+          "pt_BR": "Lead qualificado",
+          "sort": 224
+        },
+        "Lembrete enviado (4 horas antes)": {
+          "en": "Reminder sent (4 hours before)",
+          "pt_BR": "Lembrete enviado (4 horas antes)",
+          "sort": 431
+        },
+        "Mensagem de apresentação enviada": {
+          "en": "Introduction message sent",
+          "pt_BR": "Mensagem de apresentação enviada",
+          "sort": 121
+        },
+        "Múltiplos cliques identificados": {
+          "en": "Multiple clicks identified",
+          "pt_BR": "Múltiplos cliques identificados",
+          "sort": 322
+        },
+        "Necessidades identificadas": {
+          "en": "Needs identified",
+          "pt_BR": "Necessidades identificadas",
+          "sort": 222
+        },
+        "Oportunidades de upsell identificadas": {
+          "en": "Upsell opportunities identified",
+          "pt_BR": "Oportunidades de upsell identificadas",
+          "sort": 714
+        },
+        "Pesquisa NPS enviada": {
+          "en": "NPS survey sent",
+          "pt_BR": "Pesquisa NPS enviada",
+          "sort": 713
+        },
+        "Pesquisa de satisfação enviada": {
+          "en": "Satisfaction survey sent",
+          "pt_BR": "Pesquisa de satisfação enviada",
+          "sort": 443
+        },
+        "Pop-by realizado": {
+          "en": "Pop-by completed",
+          "pt_BR": "Pop-by realizado",
+          "sort": 635
+        },
+        "Portal de imóveis enviado": {
+          "en": "Properties portal sent",
+          "pt_BR": "Portal de imóveis enviado",
+          "sort": 319
+        },
+        "Preparando lembrete": {
+          "en": "Preparing reminder",
+          "pt_BR": "Preparando lembrete",
+          "sort": 423
+        },
+        "Preparando visita (roteiro IA)": {
+          "en": "Preparing visit (AI script)",
+          "pt_BR": "Preparando visita (roteiro IA)",
+          "sort": 433
+        },
+        "Primeiro envio realizado (dia 1)": {
+          "en": "First send completed (day 1)",
+          "pt_BR": "Primeiro envio realizado (dia 1)",
+          "sort": 312
+        },
+        "Promise Script enviado": {
+          "en": "Promise Script sent",
+          "pt_BR": "Promise Script enviado",
+          "sort": 318
+        },
+        "Proposta aceita": {
+          "en": "Proposal accepted",
+          "pt_BR": "Proposta aceita",
+          "sort": 531
+        },
+        "Proposta elaborada": {
+          "en": "Proposal prepared",
+          "pt_BR": "Proposta elaborada",
+          "sort": 513
+        },
+        "Proposta validada comprador": {
+          "en": "Proposal validated by buyer",
+          "pt_BR": "Proposta validada comprador",
+          "sort": 521
+        },
+        "Pós-venda iniciado": {
+          "en": "After sales started",
+          "pt_BR": "Pós-venda iniciado",
+          "sort": 711
+        },
+        "Questionário preenchido": {
+          "en": "Questionnaire filled",
+          "pt_BR": "Questionário preenchido",
+          "sort": 223
+        },
+        "Relacionamento mantido": {
+          "en": "Relationship maintained",
+          "pt_BR": "Relacionamento mantido",
+          "sort": 715
+        },
+        "Relatório preenchido": {
+          "en": "Report filled",
+          "pt_BR": "Relatório preenchido",
+          "sort": 442
+        },
+        "Resposta automática enviada": {
+          "en": "Automatic response sent",
+          "pt_BR": "Resposta automática enviada",
+          "sort": 112
+        },
+        "Segmentando lead": {
+          "en": "Segmenting lead",
+          "pt_BR": "Segmentando lead",
+          "sort": 311
+        },
+        "Segunda tentativa realizada": {
+          "en": "Second attempt made",
+          "pt_BR": "Segunda tentativa realizada",
+          "sort": 122
+        },
+        "Segundo envio realizado (dia 3)": {
+          "en": "Second send completed (day 3)",
+          "pt_BR": "Segundo envio realizado (dia 3)",
+          "sort": 313
+        },
+        "Task list aberta": {
+          "en": "Task list opened",
+          "pt_BR": "Task list aberta",
+          "sort": 615
+        },
+        "Terceira tentativa realizada": {
+          "en": "Third attempt made",
+          "pt_BR": "Terceira tentativa realizada",
+          "sort": 123
+        },
+        "Terceiro envio realizado (dia 5)": {
+          "en": "Third send completed (day 5)",
+          "pt_BR": "Terceiro envio realizado (dia 5)",
+          "sort": 314
+        },
+        "Vendedor assistiu vídeo/áudio explicativo": {
+          "en": "Seller watched explanatory video/audio",
+          "pt_BR": "Vendedor assistiu vídeo/áudio explicativo",
+          "sort": 526
+        },
+        "Visita agendada no CRM": {
+          "en": "Visit scheduled in CRM",
+          "pt_BR": "Visita agendada no CRM",
+          "sort": 412
+        },
+        "Visita em andamento": {
+          "en": "Visit in progress",
+          "pt_BR": "Visita em andamento",
+          "sort": 434
+        },
+        "Visita solicitada pelo cliente": {
+          "en": "Visit requested by customer",
+          "pt_BR": "Visita solicitada pelo cliente",
+          "sort": 401
+        },
+        "Vídeo/áudio explicativo enviado ao vendedor (IA gera script)": {
+          "en": "Explanatory video/audio sent to seller (AI generates script)",
+          "pt_BR": "Vídeo/áudio explicativo enviado ao vendedor (IA gera script)",
+          "sort": 525
+        }
+      },
+      "optionsSorter": "sort",
+      "renderAs": "with_scroll",
+      "type": "picklist"
+    },
+    "subPhaseStatusLimit": {
+      "isSortable": true,
+      "label": {
+        "en": "Sub Phase Status Limit",
+        "pt_BR": "Limite do Status da Sub-Fase"
+      },
+      "name": "subPhaseStatusLimit",
+      "type": "dateTime"
+    },
+    "transferIfStaleAt": {
+      "label": {
+        "en": "Transfer If Stale At",
+        "pt_BR": "Repassar se sem atendimento em"
+      },
+      "name": "transferIfStaleAt",
+      "type": "dateTime"
+    },
+    "serviceStartedAt": {
+      "label": {
+        "en": "Service Started At",
+        "pt_BR": "Atendimento iniciado em"
+      },
+      "name": "serviceStartedAt",
+      "type": "dateTime"
+    },
+    "type": {
+      "isInherited": true,
+      "isSortable": true,
+      "label": {
+        "en": "Type",
+        "pt_BR": "Tipo"
+      },
+      "maxSelected": 1,
+      "minSelected": 0,
+      "name": "type",
+      "options": {
+        "Investimento": {
+          "en": "Investment",
+          "pt_BR": "Investimento"
+        },
+        "Ocupação": {
+          "en": "Occupy",
+          "pt_BR": "Ocupação"
+        }
+      },
+      "optionsSorter": "asc",
+      "renderAs": "without_scroll",
+      "type": "picklist"
+    },
+    "updateNotes": {
+      "label": {
+        "en": "Update Notes",
+        "pt_BR": "Notas de Atualização"
+      },
+      "name": "updateNotes",
+      "type": "text"
+    },
+    "urgency": {
+      "label": {
+        "en": "Urgency",
+        "pt_BR": "Urgência"
+      },
+      "name": "urgency",
+      "type": "text"
+    },
+    "withdrawalReason": {
+      "isSortable": true,
+      "label": {
+        "en": "Reason for Withdrawal",
+        "pt_BR": "Motivo Desistência"
+      },
+      "maxSelected": 1,
+      "minSelected": 0,
+      "name": "withdrawalReason",
+      "options": {
+        "Aluguel": {
+          "en": "Interest in Renting",
+          "pt_BR": "Interesse em Aluguel",
+          "sort": 10
+        },
+        "Faleceu": {
+          "en": "Died",
+          "pt_BR": "Faleceu",
+          "sort": 1
+        },
+        "Não quer mais comprar": {
+          "en": "Don't want to buy",
+          "pt_BR": "Não quer mais comprar",
+          "sort": 10
+        },
+        "Proprietário de Imóvel": {
+          "en": "Property Owner",
+          "pt_BR": "Proprietário de Imóvel",
+          "sort": 11
+        },
+        "É corretor": {
+          "en": "Is broker",
+          "pt_BR": "É corretor",
+          "sort": 8
+        }
+      },
+      "optionsSorter": "sort",
+      "renderAs": "with_scroll",
+      "type": "picklist"
+    },
+    "zone": {
+      "descriptionFields": [
+        "name"
+      ],
+      "document": "Zone",
+      "isSortable": true,
+      "label": {
+        "en": "Zone",
+        "pt_BR": "Zona"
+      },
+      "name": "zone",
+      "type": "lookup"
+    },
+    "pipeimobDispatchStatus": {
+      "isSortable": true,
+      "label": {
+        "en": "PipeImob Dispatch Status",
+        "pt_BR": "Acionamento PipeImob — situação"
+      },
+      "maxSelected": 1,
+      "minSelected": 0,
+      "name": "pipeimobDispatchStatus",
+      "optionsSorter": "asc",
+      "renderAs": "without_scroll",
+      "type": "picklist",
+      "options": {
+        "pendente": {
+          "en": "Pending",
+          "pt_BR": "Pendente"
+        },
+        "enviado": {
+          "en": "Sent",
+          "pt_BR": "Enviado"
+        },
+        "falhou": {
+          "en": "Failed",
+          "pt_BR": "Falhou"
+        },
+        "bloqueado": {
+          "en": "Blocked (missing fields)",
+          "pt_BR": "Bloqueado (campos faltando)"
+        }
+      }
+    },
+    "pipeimobDispatchedAt": {
+      "isSortable": true,
+      "label": {
+        "en": "PipeImob Dispatched At",
+        "pt_BR": "Acionamento PipeImob — enviado em"
+      },
+      "name": "pipeimobDispatchedAt",
+      "type": "dateTime"
+    },
+    "pipeimobDispatchAttempts": {
+      "label": {
+        "en": "PipeImob Dispatch Attempts",
+        "pt_BR": "Acionamento PipeImob — tentativas"
+      },
+      "minValue": 0,
+      "name": "pipeimobDispatchAttempts",
+      "type": "number"
+    },
+    "pipeimobDispatchResponse": {
+      "label": {
+        "en": "PipeImob Dispatch Response (raw)",
+        "pt_BR": "Acionamento PipeImob — resposta (crua)"
+      },
+      "name": "pipeimobDispatchResponse",
+      "type": "json"
+    },
+    "pipeimobLastError": {
+      "label": {
+        "en": "PipeImob Last Error",
+        "pt_BR": "Acionamento PipeImob — último erro"
+      },
+      "name": "pipeimobLastError",
+      "type": "text"
+    },
+    "contactAttempts": {
+      "name": "contactAttempts",
+      "type": "number",
+      "label": {
+        "en": "Contact attempts",
+        "pt_BR": "Tentativas de contato"
+      },
+      "decimalSize": 0,
+      "minValue": 0
+    },
+    "firstResponseAt": {
+      "name": "firstResponseAt",
+      "type": "dateTime",
+      "label": {
+        "en": "First response at",
+        "pt_BR": "Primeira resposta em"
+      }
+    },
+    "lastActionAt": {
+      "name": "lastActionAt",
+      "type": "dateTime",
+      "label": {
+        "en": "Last action at",
+        "pt_BR": "Última ação em"
+      }
+    },
+    "phaseEnteredAt": {
+      "name": "phaseEnteredAt",
+      "type": "json",
+      "label": {
+        "en": "Phase entered at",
+        "pt_BR": "Entrada em cada fase"
+      }
+    },
+    "priorityReason": {
+      "name": "priorityReason",
+      "type": "text",
+      "label": {
+        "en": "Priority reason",
+        "pt_BR": "Motivo da prioridade"
+      }
+    },
+    "rentalPool": {
+      "name": "rentalPool",
+      "type": "text",
+      "label": {
+        "en": "Rental pool",
+        "pt_BR": "Bolsão da locação"
+      },
+      "isSortable": true
+    },
+    "dormantFromSubPhase": {
+      "name": "dormantFromSubPhase",
+      "type": "text",
+      "label": {
+        "en": "Dormant from sub phase",
+        "pt_BR": "Subfase antes de adormecer"
+      }
+    },
+    "transactionType": {
+      "name": "transactionType",
+      "type": "picklist",
+      "label": {
+        "en": "Business",
+        "pt_BR": "Negócio"
+      },
+      "options": {
+        "locacao": {
+          "en": "Rent",
+          "pt_BR": "Aluguel"
+        },
+        "venda": {
+          "en": "Sale",
+          "pt_BR": "Venda"
+        }
+      },
+      "isSortable": true,
+      "minSelected": 0,
+      "maxSelected": 1,
+      "optionsSorter": "asc",
+      "renderAs": "without_scroll"
+    },
+    "rentalLossReason": {
+      "name": "rentalLossReason",
+      "type": "picklist",
+      "label": {
+        "en": "Rental loss reason",
+        "pt_BR": "Motivo de perda (aluguel)"
+      },
+      "isSortable": true,
+      "minSelected": 0,
+      "maxSelected": 1,
+      "options": {
+        "Faleceu": {
+          "en": "Died",
+          "pt_BR": "Faleceu",
+          "sort": 1
+        },
+        "Não quer mais comprar": {
+          "en": "Doesn't want to rent anymore",
+          "pt_BR": "Não quer mais alugar",
+          "sort": 10
+        },
+        "Proprietário de Imóvel": {
+          "en": "Property Owner",
+          "pt_BR": "Proprietário de Imóvel",
+          "sort": 11
+        },
+        "É corretor": {
+          "en": "Is broker",
+          "pt_BR": "É corretor",
+          "sort": 8
+        },
+        "Sem ação no prazo": {
+          "en": "No action within deadline",
+          "pt_BR": "Sem ação no prazo",
+          "sort": 9
+        }
+      },
+      "optionsSorter": "sort",
+      "renderAs": "with_scroll"
+    },
+    "rentalDiscardReason": {
+      "name": "rentalDiscardReason",
+      "type": "picklist",
+      "label": {
+        "en": "Rental discard reason",
+        "pt_BR": "Motivo de descarte (aluguel)"
+      },
+      "isSortable": true,
+      "minSelected": 0,
+      "maxSelected": 1,
+      "options": {
+        "Cliente já comprou concorrente": {
+          "en": "Customer already bought from competitor",
+          "pt_BR": "Cliente já comprou concorrente",
+          "sort": 60
+        },
+        "Cliente já comprou outro corretor": {
+          "en": "Customer already bought with another broker",
+          "pt_BR": "Cliente já comprou outro corretor",
+          "sort": 70
+        },
+        "Cliente sem condições financeiras": {
+          "en": "Not enought money",
+          "pt_BR": "Cliente sem condições financeiras",
+          "sort": 10
+        },
+        "Cliente sem previsão de compra": {
+          "en": "Customer without rental forecast",
+          "pt_BR": "Cliente sem previsão de aluguel",
+          "sort": 40
+        },
+        "Em atendimento por outro corretor": {
+          "en": "In service with another broker",
+          "pt_BR": "Em atendimento por outro corretor",
+          "sort": 50
+        },
+        "Imóvel fora de atuação corretor": {
+          "en": "Property outside broker's zone",
+          "pt_BR": "Imóvel fora de atuação corretor",
+          "sort": 20
+        },
+        "Não consegue contato / retorno": {
+          "en": "Can't contact",
+          "pt_BR": "Não consegue contato / retorno",
+          "sort": 30
+        },
+        "Telefone inválido": {
+          "en": "Invalid phone",
+          "pt_BR": "Telefone inválido",
+          "sort": 110
+        },
+        "Lead duplicado": {
+          "en": "Duplicate lead",
+          "pt_BR": "Lead duplicado",
+          "sort": 120
+        },
+        "Spam": {
+          "en": "Spam",
+          "pt_BR": "Spam",
+          "sort": 130
+        },
+        "Pediu para não ser contatado": {
+          "en": "Asked not to be contacted",
+          "pt_BR": "Pediu para não ser contatado",
+          "sort": 140
+        }
+      },
+      "optionsSorter": "sort",
+      "renderAs": "with_scroll"
+    }
+  },
+  "namespace": [
+    "base"
+  ],
+  "events": [
+    {
+      "conditions": {
+        "all": [
+          {
+            "fact": "data",
+            "operator": "hasKey",
+            "value": "aiNotes"
+          }
+        ]
+      },
+      "event": {
+        "queue": "opportunities_filter_changes",
+        "resource": "rabbitmq_default",
+        "sendFull": true,
+        "type": "queue"
+      },
+      "name": "opportunity-ai-notes-changes"
+    },
+    {
+      "conditions": {
+        "all": [
+          {
+            "any": [
+              {
+                "condition": "operation:update"
+              },
+              {
+                "condition": "operation:create"
+              }
+            ]
+          },
+          {
+            "fact": "data",
+            "path": "$.subPhase",
+            "operator": "equal",
+            "value": "Proposta aceita"
+          },
+          {
+            "fact": "original",
+            "path": "$.subPhase",
+            "operator": "notEqual",
+            "value": "Proposta aceita"
+          },
+          {
+            "fact": "original",
+            "path": "$.subPhase[0]",
+            "operator": "notEqual",
+            "value": "Proposta aceita"
+          },
+          {
+            "fact": "full",
+            "path": "$.transactionType",
+            "operator": "notEqual",
+            "value": "locacao"
+          },
+          {
+            "fact": "full",
+            "path": "$.transactionType[0]",
+            "operator": "notEqual",
+            "value": "locacao"
+          }
+        ]
+      },
+      "event": {
+        "queue": "pipeimob-acionamento",
+        "resource": "rabbitmq_default",
+        "sendFull": true,
+        "sendOriginal": true,
+        "type": "queue"
+      },
+      "name": "pipeimob-acionamento-proposta-aceita"
+    }
+  ]
+}
