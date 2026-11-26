@@ -326,7 +326,7 @@ def gerar_arquivos(montagem: Montagem, limite_bytes: int = art.LIMITE_BYTES) -> 
         "removidos": sorted(config.removidos),
         "documentos": {meta_id: art.sha256_documento(montagem.itens[meta_id]) for meta_id in sorted(montagem.itens)},
         "origens": {meta_id: montagem.origens[meta_id] for meta_id in sorted(montagem.origens)},
-        "sha256Total": art.sha256_total(itens_bytes, namespace_bytes),
+        "sha256Total": art.sha256_total(itens_bytes, namespace_bytes, montagem.ambiente),
     }
     return {
         art.ITENS: itens_bytes,

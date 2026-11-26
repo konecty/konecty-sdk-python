@@ -60,7 +60,8 @@ manifesto.json   # cliente, versaoCliente, base, konectyMin, ambiente, deltaByte
                  # sha256Total
 ```
 
-- `sha256Total` = sha256 de `itens.json` seguido de `namespace.json`. O de cada documento é o do JSON
+- `sha256Total` = sha256 de `itens.json`, seguido de `namespace.json`, de `\n` e do `ambiente`. Com o
+  ambiente no hash, editar só o `ambiente` do manifesto não leva um artefato de dev a prod. O de cada documento é o do JSON
   canônico (chaves ordenadas, sem espaço, UTF-8).
 - `deltaBytes` soma os bytes dos arquivos do delta que existem na base; `deltaPct` é a razão sobre
   os bytes desses mesmos arquivos na base (emenda E1).

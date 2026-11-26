@@ -8,7 +8,8 @@ itens.json       # MetaObject[] completos, hooks embutidos, placeholders resolvi
 namespace.json   # patch do Namespace do ambiente (sem metadataVersion: quem aplica acrescenta)
 ```
 
-`sha256Total` é o sha256 dos bytes de `itens.json` seguidos dos de `namespace.json`. O sha256 de
+`sha256Total` é o sha256 dos bytes de `itens.json`, seguidos dos de `namespace.json`, de `\n` e do
+`ambiente` do manifesto. O sha256 de
 cada documento é o do JSON canônico do item (chaves ordenadas, sem espaços, UTF-8).
 """
 
@@ -54,8 +55,9 @@ def serializar_manifesto(manifesto: Dict[str, Any]) -> bytes:
     return (json.dumps(manifesto, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()
 
 
-def sha256_total(itens_bytes: bytes, namespace_bytes: bytes) -> str:
-    return hashlib.sha256(itens_bytes + namespace_bytes).hexdigest()
+def sha256_total(itens_bytes: bytes, namespace_bytes: bytes, ambiente: str) -> str:
+    """O ambiente entra no hash: trocar só o `ambiente` do manifesto não pode levar um artefato de dev a prod."""
+    return hashlib.sha256(itens_bytes + namespace_bytes + b"\n" + ambiente.encode("utf-8")).hexdigest()
 
 
 @dataclass
@@ -71,9 +73,10 @@ class Artefato:
         return {str(item["_id"]): item for item in self.itens}
 
     def sha256_confere(self) -> bool:
-        return sha256_total(self.itens_bytes, self.namespace_bytes) == self.manifesto.get(
-            "sha256Total"
-        )
+        ambiente = self.manifesto.get("ambiente")
+        if not isinstance(ambiente, str):
+            return False
+        return sha256_total(self.itens_bytes, self.namespace_bytes, ambiente) == self.manifesto.get("sha256Total")
 
 
 def ler_artefato(pasta: Path) -> Artefato:
