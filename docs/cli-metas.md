@@ -50,6 +50,11 @@ Variáveis de ambiente de `aplicar` e `deriva`: `KONECTY_URL` (ou `--url`), `KON
 service account com `metaApply`; vai só no header `Authorization`, nunca em log), `TENANT_ENV`
 (`dev`/`prod`) e, opcional, `GIT_COMMIT` (vira `metadataAplicacao.origem`).
 
+## Imagem
+
+Cada publicação gera `konectypro/konecty-cli:<versão>` (`ENTRYPOINT ["konecty-cli"]`, usuário 10001, sem git: serve
+para `aplicar` e `deriva`, não para `montar`). No Job: `args: [metas, aplicar, /shared/metas]`.
+
 ## Artefato
 
 ```
