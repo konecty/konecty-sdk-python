@@ -11,6 +11,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -301,6 +302,64 @@ def _montar_namespace(base_raiz: Path, patch: Any) -> Dict[str, Any]:
 
 # --------------------------------------------------------------------------- saída
 
+#: Marca a pasta de `--arvore` como gerada pelo montador: só uma pasta com ela é recriada.
+MARCA_ARVORE = ".konecty-arvore"
+
+
+def _caminho_na_arvore(origem: str) -> Path:
+    """`base:P`, `modulos/P` ou `delta/P` → `P`: o arquivo que deu origem ao meta."""
+    for prefixo in ("base:", "modulos/", "delta/"):
+        if origem.startswith(prefixo):
+            return Path(origem[len(prefixo):])
+    raise MetasInvalidasError(f"origem desconhecida na montagem: {origem}")
+
+
+def _json_arvore(valor: Any) -> str:
+    return json.dumps(valor, ensure_ascii=False, indent=2) + "\n"
+
+
+def _preparar_pasta_arvore(destino: Path) -> None:
+    if destino.exists():
+        if not destino.is_dir():
+            raise MetasInvalidasError(f"--arvore {destino} existe e não é pasta")
+        if any(destino.iterdir()) and not (destino / MARCA_ARVORE).is_file():
+            raise MetasInvalidasError(
+                f"--arvore {destino} não está vazia e não foi gerada pelo montador "
+                f"(sem {MARCA_ARVORE}); escolha outra pasta"
+            )
+        shutil.rmtree(destino)
+    destino.mkdir(parents=True)
+    (destino / MARCA_ARVORE).write_text("gerada por konecty-cli metas montar --arvore\n", encoding="utf-8")
+
+
+def escrever_arvore(montagem: Montagem, destino: Path) -> None:
+    """Grava a montagem no layout da base: `<Módulo>/document.json`, `view/`, `list/`, `access/`...
+
+    Os hooks de cada `document.json` saem em `hook/<campo>.js` (texto) ou `.json` (objeto), e o
+    Namespace do ambiente em `Namespace.json`. `ler_arvore(destino)` devolve `montagem.itens`.
+    """
+    destino = Path(destino)
+    _preparar_pasta_arvore(destino)
+    for meta_id in sorted(montagem.itens):
+        meta = montagem.itens[meta_id]
+        relativo = _caminho_na_arvore(montagem.origens[meta_id][0])
+        arquivo = destino / relativo
+        arquivo.parent.mkdir(parents=True, exist_ok=True)
+        if relativo.name == "document.json":
+            for hook in HOOK_FIELDS:
+                if hook not in meta:
+                    continue
+                valor = meta[hook]
+                pasta = arquivo.parent / "hook"
+                pasta.mkdir(exist_ok=True)
+                if isinstance(valor, str):
+                    (pasta / f"{hook}.js").write_text(valor, encoding="utf-8")
+                else:
+                    (pasta / f"{hook}.json").write_text(_json_arvore(valor), encoding="utf-8")
+            meta = {chave: valor for chave, valor in meta.items() if chave not in HOOK_FIELDS}
+        arquivo.write_text(_json_arvore(meta), encoding="utf-8")
+    (destino / NAMESPACE_ARQUIVO).write_text(_json_arvore(montagem.namespace), encoding="utf-8")
+
 
 def gerar_arquivos(montagem: Montagem, limite_bytes: int = art.LIMITE_BYTES) -> Dict[str, bytes]:
     """Os três arquivos do artefato. Falha acima de `limite_bytes` com o tamanho no erro."""
@@ -345,8 +404,13 @@ def montar(
     base_repo: str = BASE_REPO_PADRAO,
     tar: bool = False,
     limite_bytes: int = art.LIMITE_BYTES,
+    arvore: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    """Monta e grava o artefato em `saida`. Devolve o manifesto."""
+    """Monta e grava o artefato em `saida`. Devolve o manifesto.
+
+    Com `arvore`, grava também a montagem no layout da base (`escrever_arvore`), para os testes
+    de hook do cliente lerem o metadado montado. O artefato não muda.
+    """
     with tempfile.TemporaryDirectory(prefix="metas-base-") as temporario:
         if base_dir is None:
             config = ler_config(Path(repo))
@@ -362,4 +426,6 @@ def montar(
     if tar:
         nome_tar = f"{montagem.config.cliente}-{montagem.versao}-{ambiente}.tar.gz"
         art.escrever_tar(saida / nome_tar, arquivos)
+    if arvore is not None:
+        escrever_arvore(montagem, Path(arvore))
     return json.loads(arquivos[art.MANIFESTO])
