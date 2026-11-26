@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
+import os
 import tempfile
 from pathlib import Path
 from typing import Optional
 
 import click
 
+from ...lib.client import KonectyClient
+
+from .aplicar import aplicar
 from .diff import diff
-from .erros import MetasInvalidasError
+from .erros import AplicacaoRecusadaError, LoteRecusadoError, MetasInvalidasError
 from .gerar_delta import gerar_delta
 from .linter import linter
 from .montar import BASE_REPO_PADRAO, montar, obter_base
@@ -115,3 +121,43 @@ def diff_command(artefato_a: Path, artefato_b: Path, markdown: bool) -> None:
         click.echo(diff(artefato_a, artefato_b, markdown=markdown), nl=False)
     except MetasInvalidasError as erro:
         raise click.ClickException(str(erro)) from None
+
+
+def _client_do_ambiente(url: Optional[str]) -> KonectyClient:
+    url = url or os.environ.get("KONECTY_URL")
+    token = os.environ.get("KONECTY_TOKEN")
+    if not url:
+        raise click.ClickException("informe --url ou KONECTY_URL")
+    if not token:
+        raise click.ClickException("KONECTY_TOKEN não definido")
+    return KonectyClient(base_url=url, token=token)
+
+
+def _configurar_log() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+
+@metas_group.command(name="aplicar")
+@click.argument("pasta", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option("--url", default=None, help="URL do Konecty (padrão: KONECTY_URL)")
+def aplicar_command(pasta: Path, url: Optional[str]) -> None:
+    """Aplica o artefato de PASTA no tenant (token em KONECTY_TOKEN, ambiente em TENANT_ENV).
+
+    Sai com 2 quando o sha256 ou o ambiente não conferem (nada é enviado) e com 1 quando o
+    Konecty recusa o lote ou não responde depois das tentativas.
+    """
+    _configurar_log()
+    client = _client_do_ambiente(url)
+    try:
+        resultado = asyncio.run(
+            aplicar(pasta, client, tenant_env=os.environ.get("TENANT_ENV"), origem=os.environ.get("GIT_COMMIT"))
+        )
+    except AplicacaoRecusadaError as erro:
+        click.echo(f"Erro: {erro}", err=True)
+        raise SystemExit(2) from None
+    except (LoteRecusadoError, MetasInvalidasError) as erro:
+        raise click.ClickException(str(erro)) from None
+    click.echo(
+        f"aplicados={resultado.aplicados} criados={len(resultado.criados)} "
+        f"alterados={len(resultado.atualizados)} metadataVersion={'gravado' if resultado.versao_gravada else 'inalterado'}"
+    )
