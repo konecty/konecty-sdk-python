@@ -4,8 +4,9 @@ Regras:
 
 - **erro** `repete-base`: o patch grava numa chave o mesmo valor que a base já tem (AC-355, 2ª
   parte); vale também para hook `.js` igual ao da base e para patch vazio `{}`.
-- **erro** `conflito-base`: o patch apaga (`null`) uma chave que a base não tem; o patch mexe em
-  `fields.<campo>` que a base não tem sem definir o campo inteiro (sem `type`); ou um módulo de
+- **erro** `conflito-base`: o patch apaga (`null`) uma chave que a base não tem; o patch de um
+  `document`/`composite` mexe em `fields.<campo>` que a base não tem sem definir o campo inteiro
+  (sem `type`; em `access`, `fields.<campo>` é permissão e não tem `type`); ou um módulo de
   `modulos/` tem o nome de um módulo da base e não está em `naoMigrados`.
 - **aviso** `array-igual`: o patch repete uma lista inteira igual à da base (RFC 7386 substitui
   a lista inteira, então o delta não encolhe, mas também não muda nada).
@@ -41,7 +42,18 @@ def _caminho(partes: Tuple[str, ...]) -> str:
     return ".".join(partes)
 
 
-def _comparar(patch: Any, base: Any, partes: Tuple[str, ...], arquivo: str, achados: List[Achado]) -> None:
+#: Metas cujo `fields.<campo>` é definição de campo (com `type`). Em `access`, é permissão.
+TIPOS_COM_DEFINICAO_DE_CAMPO = ("document", "composite")
+
+
+def _comparar(
+    patch: Any,
+    base: Any,
+    partes: Tuple[str, ...],
+    arquivo: str,
+    achados: List[Achado],
+    define_campos: bool = True,
+) -> None:
     if not isinstance(patch, dict) or e_marcador_null(patch):
         return
     base_obj = base if isinstance(base, dict) else {}
@@ -62,8 +74,8 @@ def _comparar(patch: Any, base: Any, partes: Tuple[str, ...], arquivo: str, acha
             if valor == {} and existe and isinstance(atual, dict):
                 achados.append(Achado("erro", "repete-base", arquivo, f"{_caminho(caminho)}: patch vazio"))
             elif existe and isinstance(atual, dict):
-                _comparar(valor, atual, caminho, arquivo, achados)
-            elif not existe and len(caminho) == 2 and caminho[0] == "fields" and "type" not in valor:
+                _comparar(valor, atual, caminho, arquivo, achados, define_campos)
+            elif define_campos and not existe and len(caminho) == 2 and caminho[0] == "fields" and "type" not in valor:
                 achados.append(
                     Achado(
                         "erro",
@@ -142,7 +154,8 @@ def _comparar_raiz(patch: Any, base: Any, nome: str, achados: List[Achado]) -> N
     if patch == {}:
         achados.append(Achado("erro", "repete-base", nome, "patch vazio"))
         return
-    _comparar(patch, base, (), nome, achados)
+    tipo = base.get("type") if isinstance(base, dict) else None
+    _comparar(patch, base, (), nome, achados, define_campos=tipo is None or tipo in TIPOS_COM_DEFINICAO_DE_CAMPO)
 
 
 def _alvo_do_hook(relativo: Path, por_arquivo: dict, base: Any) -> Optional[Any]:

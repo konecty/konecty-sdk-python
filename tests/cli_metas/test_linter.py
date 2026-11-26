@@ -69,6 +69,23 @@ def test_campo_novo_inteiro_do_cliente_nao_e_conflito(repo_cliente: Path, base_d
     assert linter(repo_cliente, base_dir) == []
 
 
+def test_campo_novo_em_access_nao_exige_type(repo_cliente: Path, base_dir: Path) -> None:
+    # Em access, `fields.<campo>` é permissão ({"READ": {...}}), não definição de campo: não tem
+    # `type`. A regra "campo novo sem type" é só de document. Achado na migração da Aux (fase 5):
+    # 1.814 falsos erros, todos em access.
+    escrever(
+        base_dir,
+        "Product/access/Corretor.json",
+        {"_id": "Product:access:Corretor", "type": "access", "fields": {"code": {"READ": {"allow": True}}}},
+    )
+    escrever(
+        repo_cliente,
+        "delta/Product/access/Corretor.json",
+        {"fields": {"novo": {"READ": {"allow": True}, "UPDATE": {"allow": False}}}},
+    )
+    assert linter(repo_cliente, base_dir) == []
+
+
 def test_modulo_do_cliente_com_nome_de_modulo_da_base_e_conflito(repo_cliente: Path, base_dir: Path) -> None:
     escrever(repo_cliente, "modulos/Opportunity/document.json", {"_id": "Opportunity", "type": "document"})
     assert regras(linter(repo_cliente, base_dir)) == [("erro", "conflito-base", "modulos/Opportunity")]

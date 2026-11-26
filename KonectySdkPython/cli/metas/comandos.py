@@ -41,6 +41,12 @@ def metas_group() -> None:
 )
 @click.option("--base-repo", default=BASE_REPO_PADRAO, show_default=True, help="Repositório Git com as tags base-metas/*")
 @click.option("--tar", "gerar_tar", is_flag=True, help="Também gera <cliente>-<versão>-<ambiente>.tar.gz")
+@click.option(
+    "--arvore",
+    default=None,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Também grava a montagem no layout da base (<Módulo>/document.json, hook/*.js...), para testes",
+)
 def montar_command(
     repo: Path,
     ambiente: str,
@@ -49,11 +55,12 @@ def montar_command(
     base_dir: Optional[Path],
     base_repo: str,
     gerar_tar: bool,
+    arvore: Optional[Path],
 ) -> None:
     """Monta o artefato (itens.json, namespace.json, manifesto.json) de REPO."""
     try:
         manifesto = montar(
-            repo, ambiente, saida, versao=versao, base_dir=base_dir, base_repo=base_repo, tar=gerar_tar
+            repo, ambiente, saida, versao=versao, base_dir=base_dir, base_repo=base_repo, tar=gerar_tar, arvore=arvore
         )
     except MetasInvalidasError as erro:
         raise click.ClickException(str(erro)) from None
@@ -62,6 +69,8 @@ def montar_command(
         f"{len(manifesto['documentos'])} documentos, delta {manifesto['deltaBytes']} bytes "
         f"({manifesto['deltaPct']}%), sha256 {manifesto['sha256Total']}"
     )
+    if arvore is not None:
+        click.echo(f"árvore montada em {arvore}")
 
 
 @metas_group.command(name="gerar-delta")
