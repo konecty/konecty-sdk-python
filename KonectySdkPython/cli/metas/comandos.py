@@ -14,6 +14,7 @@ import click
 from ...lib.client import KonectyClient
 
 from .aplicar import aplicar
+from .deriva import deriva
 from .diff import diff
 from .erros import AplicacaoRecusadaError, LoteRecusadoError, MetasInvalidasError
 from .gerar_delta import gerar_delta
@@ -161,3 +162,22 @@ def aplicar_command(pasta: Path, url: Optional[str]) -> None:
         f"aplicados={resultado.aplicados} criados={len(resultado.criados)} "
         f"alterados={len(resultado.atualizados)} metadataVersion={'gravado' if resultado.versao_gravada else 'inalterado'}"
     )
+
+
+@metas_group.command(name="deriva")
+@click.argument("pasta", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option("--url", default=None, help="URL do Konecty (padrão: KONECTY_URL)")
+@click.option("--tenant", default=None, help="Rótulo tenant da métrica (padrão: <cliente>-<ambiente>)")
+def deriva_command(pasta: Path, url: Optional[str], tenant: Optional[str]) -> None:
+    """Mede a divergência entre o tenant e o artefato de PASTA, só com dryRun (nunca escreve)."""
+    _configurar_log()
+    client = _client_do_ambiente(url)
+    try:
+        resultado = asyncio.run(deriva(pasta, client, tenant_env=os.environ.get("TENANT_ENV"), tenant=tenant))
+    except AplicacaoRecusadaError as erro:
+        click.echo(f"Erro: {erro}", err=True)
+        raise SystemExit(2) from None
+    except (LoteRecusadoError, MetasInvalidasError) as erro:
+        raise click.ClickException(str(erro)) from None
+    for linha in resultado.linhas():
+        click.echo(linha)

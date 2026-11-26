@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Callable
 
 import pytest
-from apoio_metas import NAMESPACE_BASE, OPPORTUNITY, PRODUCT, PRODUCT_SCRIPT, Conteudo, config_yaml, escrever
+import pytest_asyncio
+from aiohttp import web
+from apoio_metas import NAMESPACE_BASE, KonectyFalso, OPPORTUNITY, PRODUCT, PRODUCT_SCRIPT, Conteudo, config_yaml, escrever
 
 
 @pytest.fixture
@@ -55,3 +57,17 @@ def repo_git_com_tag(tmp_path: Path, base_dir: Path) -> Callable[[str], Path]:
 @pytest.fixture
 def escrever_arquivo() -> Callable[[Path, str, Conteudo], Path]:
     return escrever
+
+
+@pytest_asyncio.fixture
+async def konecty():
+    falso = KonectyFalso()
+    runner = web.AppRunner(falso.app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    falso.base_url = f"http://127.0.0.1:{runner.addresses[0][1]}"
+    try:
+        yield falso
+    finally:
+        await runner.cleanup()

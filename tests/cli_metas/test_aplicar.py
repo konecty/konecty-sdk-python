@@ -11,12 +11,10 @@ import json
 import logging
 import socket
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import pytest
-import pytest_asyncio
-from aiohttp import web
-from apoio_metas import escrever
+from apoio_metas import TOKEN, KonectyFalso, escrever
 from click.testing import CliRunner
 
 from KonectySdkPython.cli import cli
@@ -24,94 +22,6 @@ from KonectySdkPython.cli.metas.aplicar import aplicar
 from KonectySdkPython.cli.metas.erros import AplicacaoRecusadaError, LoteRecusadoError
 from KonectySdkPython.cli.metas.montar import montar
 from KonectySdkPython.lib.client import KonectyClient
-
-TOKEN = "fake-pat-metaapply-nao-e-real-0123456789"
-HOOKS = ("scriptBeforeValidation", "validationScript", "scriptAfterSave", "validationData")
-
-
-class KonectyFalso:
-    def __init__(self) -> None:
-        self.metas: Dict[str, Dict[str, Any]] = {}
-        self.namespace: Dict[str, Any] = {"_id": "Namespace", "type": "namespace", "ns": "acme"}
-        self.requisicoes: List[Dict[str, Any]] = []
-        self.falhas: List[int] = []
-        self.status_leitura_namespace = 200
-        self.erros_de_schema: Optional[List[Dict[str, Any]]] = None
-        self.preserved_hooks: Dict[str, List[str]] = {}
-        self.app = web.Application()
-        self.app.router.add_route("*", "/{tail:.*}", self._atender)
-        self.base_url = ""
-
-    @property
-    def escritas(self) -> List[Dict[str, Any]]:
-        return [r["json"] for r in self.requisicoes if r["path"] == "/api/document" and not r["json"].get("dryRun")]
-
-    @property
-    def simulacoes(self) -> List[Dict[str, Any]]:
-        return [r["json"] for r in self.requisicoes if r["path"] == "/api/document" and r["json"].get("dryRun")]
-
-    async def _atender(self, request: web.Request) -> web.Response:
-        corpo = await request.json() if request.can_read_body else None
-        self.requisicoes.append(
-            {"method": request.method, "path": request.path, "json": corpo, "authorization": request.headers.get("Authorization")}
-        )
-        if request.path == "/rest/auth/info":
-            return web.json_response({"logged": True, "user": {"_id": "sa-metas"}})
-        if request.path == "/api/admin/meta/Namespace":
-            if self.status_leitura_namespace != 200:
-                return web.Response(text="Unauthorized", status=self.status_leitura_namespace)
-            return web.json_response({"success": True, "data": [self.namespace]})
-        if request.path != "/api/document" or request.method != "POST":
-            return web.Response(status=404)
-        if self.falhas:
-            status = self.falhas.pop(0)
-            return web.Response(text="Internal server error", status=status)
-        itens = corpo.get("items") or []
-        if not itens:
-            return web.json_response({"error": "items must not be empty"}, status=400)
-        if self.erros_de_schema is not None:
-            return web.json_response({"errors": self.erros_de_schema}, status=400)
-        if corpo.get("dryRun"):
-            return web.json_response(self._plano(itens, corpo.get("hookMode")))
-        for item in itens:
-            self.metas[item["_id"]] = item
-        if corpo.get("namespacePatch"):
-            self.namespace.update(corpo["namespacePatch"])
-        return web.json_response(
-            {"applied": len(itens), "created": 0, "updated": 0, "deleted": 0, "warnings": [], "preservedHooks": self.preserved_hooks}
-        )
-
-    def _plano(self, itens: List[Dict[str, Any]], hook_mode: Optional[str]) -> Dict[str, Any]:
-        plano: Dict[str, Any] = {"created": [], "updated": [], "unchanged": 0, "hooksRemoved": {}}
-        for item in itens:
-            atual = self.metas.get(item["_id"])
-            if atual is None:
-                plano["created"].append(item["_id"])
-                continue
-            chaves = sorted(k for k in set(item) | set(atual) if item.get(k) != atual.get(k))
-            if chaves:
-                plano["updated"].append({"_id": item["_id"], "keys": chaves})
-            else:
-                plano["unchanged"] += 1
-            removidos = [h for h in HOOKS if atual.get(h) is not None and item.get(h) is None]
-            if removidos and hook_mode == "replace":
-                plano["hooksRemoved"][item["_id"]] = removidos
-        return {"applied": 0, "created": 0, "updated": 0, "deleted": 0, "warnings": [], "preservedHooks": {}, "plan": plano}
-
-
-@pytest_asyncio.fixture
-async def konecty():
-    falso = KonectyFalso()
-    runner = web.AppRunner(falso.app)
-    await runner.setup()
-    site = web.TCPSite(runner, "127.0.0.1", 0)
-    await site.start()
-    falso.base_url = f"http://127.0.0.1:{runner.addresses[0][1]}"
-    try:
-        yield falso
-    finally:
-        await runner.cleanup()
-
 
 @pytest.fixture
 def artefato(repo_cliente: Path, base_dir: Path, tmp_path: Path) -> Path:
