@@ -29,6 +29,10 @@ naoMigrados: []         # módulos da base substituídos inteiros pela cópia em
 Regras do delta:
 
 - `null` apaga a chave; `{"$null": true}` grava `null` literal; lista é substituída inteira.
+- `"$ordem": [chaves]` num objeto fixa a ordem das chaves do resultado (as listadas primeiro, as
+  demais na ordem que tinham). O Merge Patch puro segue a ordem da base, e no Konecty a ordem é
+  comportamento (condições de filtro, colunas de lista, campos). O `gerar-delta` emite `$ordem`
+  só onde a ordem do cliente difere da que o merge daria.
 - `delta/<M>/hook/<nome>.js` troca o hook; `hook/<nome>.json` é Merge Patch sobre o hook da base.
   Para tirar um hook da base, ponha `"<nome>": null` no `delta/<M>/document.json`.
 - Um `.json` do delta num caminho que a base não tem é um meta novo inteiro (precisa de `_id`).
