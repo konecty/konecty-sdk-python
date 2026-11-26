@@ -305,7 +305,9 @@ class AdminService(BaseService):
 
         Returns o corpo da rota, **sem** envelope ``{success, data}``: ``{applied, created, updated,
         deleted, warnings, preservedHooks}``, mais ``plan: {created, updated: [{_id, keys}],
-        unchanged, hooksRemoved}`` quando ``dry_run=True`` (nada é gravado).
+        unchanged, hooksRemoved, namespace?}`` quando ``dry_run=True`` (nada é gravado). ``namespace:
+        {keys}`` só vem com ``namespace_patch``: as chaves do patch cujo valor difere do Namespace
+        gravado; ``[]`` quer dizer que o patch não muda nada (um PAT não lê o Namespace).
 
         Aceita sessão ou PAT de admin, ou PAT de service account criada com
         ``capabilities=["metaApply"]``. Recusas, todas como :class:`KonectyMetaBulkError` com
