@@ -8,6 +8,7 @@ from typing import Optional
 
 import click
 
+from .diff import diff
 from .erros import MetasInvalidasError
 from .gerar_delta import gerar_delta
 from .linter import linter
@@ -102,3 +103,15 @@ def linter_command(repo: Path, base_dir: Optional[Path], base_repo: str) -> None
     click.echo(f"linter: {erros} erros, {avisos} avisos")
     if erros:
         raise SystemExit(1)
+
+
+@metas_group.command(name="diff")
+@click.argument("artefato_a", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.argument("artefato_b", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option("--markdown", is_flag=True, help="Saída em Markdown, para comentário de PR")
+def diff_command(artefato_a: Path, artefato_b: Path, markdown: bool) -> None:
+    """Diff de ARTEFATO_A para ARTEFATO_B, por documento e por chave."""
+    try:
+        click.echo(diff(artefato_a, artefato_b, markdown=markdown), nl=False)
+    except MetasInvalidasError as erro:
+        raise click.ClickException(str(erro)) from None
