@@ -111,7 +111,9 @@ def test_artefato_tem_itens_namespace_e_manifesto(repo_cliente: Path, base_dir: 
     for item in artefato.itens:
         canonico = json.dumps(item, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
         assert manifesto["documentos"][item["_id"]] == hashlib.sha256(canonico).hexdigest()
-    total = hashlib.sha256((saida / "itens.json").read_bytes() + (saida / "namespace.json").read_bytes())
+    total = hashlib.sha256(
+        (saida / "itens.json").read_bytes() + (saida / "namespace.json").read_bytes() + b"\n" + b"prod"
+    )
     assert manifesto["sha256Total"] == total.hexdigest()
     assert manifesto["origens"]["Product"] == ["base:Product/document.json", "delta/Product/document.json"]
 
@@ -182,10 +184,13 @@ def test_tar_gz_traz_os_tres_arquivos(repo_cliente: Path, base_dir: Path, tmp_pa
 
 
 def test_delta_de_modulo_orfao_falha_nomeando_o_arquivo(repo_cliente: Path, base_dir: Path, tmp_path: Path) -> None:
-    orfao = escrever(repo_cliente, "delta/Fantasma/document.json", {"fields": {}})
+    orfao = escrever(
+        repo_cliente, "delta/Fantasma/document.json", {"_id": "Fantasma", "type": "document", "name": "Fantasma"}
+    )
     with pytest.raises(MetasInvalidasError) as erro:
         montar(repo_cliente, "dev", tmp_path / "dist", base_dir=base_dir)
     assert str(orfao) in str(erro.value)
+    assert "não existe na base nem em modulos/" in str(erro.value)
     assert not (tmp_path / "dist").exists()
 
 

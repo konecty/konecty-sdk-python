@@ -7,6 +7,7 @@ grava os itens por replace e aplica `namespacePatch` como `$set` de topo.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import socket
@@ -193,6 +194,38 @@ async def test_sha256_que_nao_confere_falha_antes_da_api(konecty: KonectyFalso, 
 
 
 @pytest.mark.asyncio
+async def test_namespace_adulterado_falha_antes_da_api(konecty: KonectyFalso, artefato: Path) -> None:
+    namespace = json.loads((artefato / "namespace.json").read_text("utf-8"))
+    namespace["adulterado"] = True
+    (artefato / "namespace.json").write_text(json.dumps(namespace), encoding="utf-8")
+    with pytest.raises(AplicacaoRecusadaError, match="sha256Total"):
+        await aplicar(artefato, client(konecty), tenant_env="dev", dormir=Relogio())
+    assert konecty.requisicoes == []
+
+
+@pytest.mark.asyncio
+async def test_sha256_de_um_documento_no_manifesto_adulterado_falha(konecty: KonectyFalso, artefato: Path) -> None:
+    manifesto = json.loads((artefato / "manifesto.json").read_text("utf-8"))
+    primeiro = sorted(manifesto["documentos"])[0]
+    manifesto["documentos"][primeiro] = "0" * 64
+    (artefato / "manifesto.json").write_text(json.dumps(manifesto), encoding="utf-8")
+    with pytest.raises(AplicacaoRecusadaError, match=f"por documento.*{primeiro}"):
+        await aplicar(artefato, client(konecty), tenant_env="dev", dormir=Relogio())
+    assert konecty.requisicoes == []
+
+
+@pytest.mark.asyncio
+async def test_manifesto_com_ambiente_editado_falha_no_sha256(konecty: KonectyFalso, artefato: Path) -> None:
+    """Montado para dev; trocar só o `ambiente` do manifesto não pode levá-lo a prod."""
+    manifesto = json.loads((artefato / "manifesto.json").read_text("utf-8"))
+    manifesto["ambiente"] = "prod"
+    (artefato / "manifesto.json").write_text(json.dumps(manifesto), encoding="utf-8")
+    with pytest.raises(AplicacaoRecusadaError, match="sha256Total"):
+        await aplicar(artefato, client(konecty), tenant_env="prod", dormir=Relogio())
+    assert konecty.requisicoes == []
+
+
+@pytest.mark.asyncio
 async def test_ambiente_trocado_e_recusado_antes_da_api(konecty: KonectyFalso, artefato: Path) -> None:
     with pytest.raises(AplicacaoRecusadaError, match="'dev'.*'prod'"):
         await aplicar(artefato, client(konecty), tenant_env="prod", dormir=Relogio())
@@ -285,3 +318,17 @@ def test_cli_sem_token_falha(artefato: Path) -> None:
     )
     assert resultado.exit_code == 1
     assert "KONECTY_TOKEN" in resultado.output
+
+
+@pytest.mark.asyncio
+async def test_cli_lote_recusado_sai_com_1_nomeando_o_erro(konecty: KonectyFalso, artefato: Path) -> None:
+    konecty.erros_de_schema = [{"index": 0, "path": "label", "message": "Required"}]
+    resultado = await asyncio.to_thread(
+        CliRunner().invoke,
+        cli,
+        ["metas", "aplicar", str(artefato), "--url", konecty.base_url],
+        env={"KONECTY_TOKEN": TOKEN, "TENANT_ENV": "dev"},
+    )
+    assert resultado.exit_code == 1
+    assert "Required" in resultado.output
+    assert TOKEN not in resultado.output
