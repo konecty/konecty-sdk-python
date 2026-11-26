@@ -29,6 +29,8 @@ jobs:
     publish:
         name: Publish to PyPI
         runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.version.outputs.version }}
         steps:
             # O workflow commita o bump de volta; rodar a partir de outra branch
             # empurraria a versão nova para um lugar que não é a fonte de verdade.
@@ -116,3 +118,60 @@ jobs:
                     echo "- PyPI: https://pypi.org/project/konecty-sdk-python/${{ steps.version.outputs.version }}/"
                     echo "- Incremento: \`${{ inputs.bump }}\`"
                   } >>"$GITHUB_STEP_SUMMARY"
+
+    # Imagem do Job aplicar-metas e do CronJob deriva-metas. Job à parte, depois da tag: se o push da
+    # imagem falhar, o PyPI e a main já estão consistentes e basta re-executar só este job.
+    image:
+        name: Push konectypro/konecty-cli
+        needs: publish
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        permissions:
+            contents: read
+        steps:
+            - name: Checkout the release tag
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ needs.publish.outputs.version }}
+
+            - name: Setup uv
+              uses: astral-sh/setup-uv@v5
+
+            - name: Build the wheel
+              run: |
+                  set -euo pipefail
+                  rm -rf dist-build
+                  uv build --wheel --out-dir dist-build
+                  ls -l dist-build
+
+            - name: Setup QEMU
+              uses: docker/setup-qemu-action@v3
+
+            - name: Setup Buildx
+              uses: docker/setup-buildx-action@v3
+
+            # konectypro: a conta da org (DOCKER_USERNAME/DOCKER_PASSWORD, secrets de organização).
+            - name: Login to Docker Hub (konectypro)
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Build and push
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  platforms: linux/amd64,linux/arm64
+                  push: true
+                  provenance: false
+                  tags: konectypro/konecty-cli:${{ needs.publish.outputs.version }}
+
+            - name: Smoke test
+              run: |
+                  set -euo pipefail
+                  IMAGE='konectypro/konecty-cli:${{ needs.publish.outputs.version }}'
+                  docker run --rm "$IMAGE" metas --help
+
+            - name: Summary
+              run: |
+                  echo "- Imagem: \`konectypro/konecty-cli:${{ needs.publish.outputs.version }}\`" >>"$GITHUB_STEP_SUMMARY"

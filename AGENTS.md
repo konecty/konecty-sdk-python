@@ -30,6 +30,9 @@ E na direção do backend: mudança na superfície pública do `konecty/Konecty`
 - **Não edite a versão à mão.** O bump faz parte do publish: o workflow escreve `version` no `pyproject.toml` com `uv version --bump`, publica e **só então** commita `chore(release): <versão>` e taggeia. A ordem é deliberada — upload que falha não pode deixar na `main` um bump anunciando versão que não existe no PyPI.
 - `pyproject.toml` é a única fonte de verdade da versão. O `setup.py` da raiz está defasado e não participa do build (o backend é hatchling).
 - Requer o secret `PYPI_API_TOKEN`.
+- Depois da tag, o job `image` do mesmo workflow publica `konectypro/konecty-cli:<versão>` (amd64 e arm64) a partir da
+  wheel da tag, com os secrets de organização `DOCKER_USERNAME`/`DOCKER_PASSWORD`. Se só ele falhar, re-execute só esse
+  job: o PyPI e a `main` já estão consistentes. O `Dockerfile` da raiz instala a wheel de `dist-build/`.
 
 ## Testes
 
