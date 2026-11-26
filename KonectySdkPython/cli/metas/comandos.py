@@ -8,6 +8,7 @@ from typing import Optional
 import click
 
 from .erros import MetasInvalidasError
+from .gerar_delta import gerar_delta
 from .montar import BASE_REPO_PADRAO, montar
 
 
@@ -49,4 +50,26 @@ def montar_command(
         f"artefato {manifesto['cliente']} {manifesto['versaoCliente']} ({ambiente}) em {saida}: "
         f"{len(manifesto['documentos'])} documentos, delta {manifesto['deltaBytes']} bytes "
         f"({manifesto['deltaPct']}%), sha256 {manifesto['sha256Total']}"
+    )
+
+
+@metas_group.command(name="gerar-delta")
+@click.argument("base_dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.argument("copia", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option("--saida", required=True, type=click.Path(file_okay=False, path_type=Path), help="Repositório do cliente")
+@click.option("--cliente", required=True, help="Nome do cliente no metadados.yaml")
+@click.option("--base", "base_tag", required=True, help="Tag da base em uso (base-metas/vX.Y.Z)")
+@click.option("--konecty", default=None, help="Versão mínima do Konecty (ex.: '>=3.19.0')")
+def gerar_delta_command(
+    base_dir: Path, copia: Path, saida: Path, cliente: str, base_tag: str, konecty: Optional[str]
+) -> None:
+    """Migra a cópia completa COPIA para delta sobre BASE_DIR (metadata/base daquela tag)."""
+    try:
+        resumo = gerar_delta(base_dir, copia, saida, cliente=cliente, base_tag=base_tag, konecty=konecty)
+    except MetasInvalidasError as erro:
+        raise click.ClickException(str(erro)) from None
+    click.echo(
+        f"delta em {saida}: {len(resumo.patches)} patches, {len(resumo.novos)} metas novos, "
+        f"{len(resumo.hooks)} hooks, {len(resumo.modulos)} módulos só do cliente, "
+        f"{len(resumo.removidos)} removidos, {resumo.iguais} iguais à base"
     )
