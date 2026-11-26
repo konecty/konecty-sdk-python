@@ -63,7 +63,9 @@ class KonectyMetaBulkError(KonectyAPIError):
     - ``{"error": "..."}`` (option with a wrong type, empty ``items``): ``[{message}]``.
     - plain text (``Unauthorized``, ``Forbidden``, ``Internal server error``): ``[{message: text}]``.
 
-    An empty body becomes ``[{message: "<status>"}]``. Subclasses KonectyAPIError so existing
+    An empty body becomes ``[{message: "<status>"}]``. A request that gets no answer at all (connection
+    refused, DNS, timeout) raises this error with ``status`` 0, like the TypeScript SDK's ``status: 0``,
+    so a retry can catch one exception. Subclasses KonectyAPIError so existing
     ``except KonectyAPIError`` keeps working.
 
     Mirrors ``applyMetaBulk``'s ``{success: false, status, errors}`` in the TypeScript SDK
@@ -71,7 +73,9 @@ class KonectyMetaBulkError(KonectyAPIError):
     """
 
     def __init__(self, status: int, errors: List[Dict[str, Any]]) -> None:
-        super().__init__("; ".join(str(error.get("message", "")) for error in errors))
+        super().__init__(
+            "; ".join(str(error.get("message", "")) if isinstance(error, dict) else str(error) for error in errors)
+        )
         self.status = status
         self.errors = errors
 

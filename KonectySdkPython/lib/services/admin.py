@@ -9,6 +9,8 @@ import json
 from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import quote
 
+import aiohttp
+
 from ..exceptions import KonectyMetaBulkError
 from ..http import request_raw
 from .base import BaseService
@@ -308,8 +310,8 @@ class AdminService(BaseService):
         Aceita sessão ou PAT de admin, ou PAT de service account criada com
         ``capabilities=["metaApply"]``. Recusas, todas como :class:`KonectyMetaBulkError` com
         ``status`` e ``errors``: 400 (item inválido, opção com tipo errado, ``dry_run`` ou
-        ``namespace_patch`` junto com ``delete_removed``), 401, 403, 413 (corpo acima de 16 MiB)
-        e 5xx.
+        ``namespace_patch`` junto com ``delete_removed``), 401, 403, 413 (corpo acima de 16 MiB),
+        5xx e, com ``status`` 0, falha de rede.
 
         Paridade: ``applyMetaBulk`` no SDK TypeScript; ``tests/test_meta_bulk.py`` e
         ``src/__test__/api/adminMetaBulk.test.ts`` usam a mesma tabela de casos.
@@ -324,7 +326,10 @@ class AdminService(BaseService):
         if namespace_patch is not None:
             payload["namespacePatch"] = namespace_patch
 
-        status, text = await request_raw(self._client, "POST", META_BULK_PATH, json=payload)
+        try:
+            status, text = await request_raw(self._client, "POST", META_BULK_PATH, json=payload)
+        except aiohttp.ClientError as error:
+            raise KonectyMetaBulkError(0, [{"message": str(error) or type(error).__name__}]) from error
         if status >= 400:
             raise KonectyMetaBulkError(status, _meta_bulk_errors(status, text))
         return json.loads(text)

@@ -56,9 +56,8 @@ async def request_raw(
     if json is not None:
         kwargs["json"] = json
 
-    async with aiohttp.ClientSession() as session:
-        async with session.request(method, url, **kwargs) as response:
-            return response.status, await response.text()
+    async with aiohttp.ClientSession() as session, session.request(method, url, **kwargs) as response:
+        return response.status, await response.text()
 
 
 async def request(

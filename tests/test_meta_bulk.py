@@ -8,6 +8,7 @@ Parity: `src/__test__/api/adminMetaBulk.test.ts` in `konecty/konecty-sdk` runs t
 input and same expected output, case by case (``CASE`` names match).
 """
 
+import socket
 from typing import Any, Dict
 
 import pytest
@@ -42,6 +43,7 @@ async def test_dry_run_sends_only_given_options_and_returns_plan(stub_server) ->
     assert request["method"] == "POST"
     assert request["path"] == "/api/document"
     assert request["json"] == {"items": [ITEM], "dryRun": True}
+    assert request["authorization"] == FAKE_AUTH_ID
 
 
 @pytest.mark.asyncio
@@ -71,7 +73,7 @@ async def test_options_map_to_camel_case_body(stub_server) -> None:
 @pytest.mark.asyncio
 async def test_400_errors_list_is_kept(stub_server) -> None:
     """CASE 400-errors: `{errors: [...]}` chega como está."""
-    errors = [{"message": "Required", "_id": "Bad", "path": "name"}]
+    errors = [{"index": 0, "path": "name", "message": "Required"}]
     stub_server.route("POST", "/api/document", {"errors": errors}, status=400)
 
     with pytest.raises(KonectyMetaBulkError) as caught:
@@ -96,8 +98,8 @@ async def test_400_error_string_becomes_list(stub_server) -> None:
 
 @pytest.mark.asyncio
 async def test_403_plain_text(stub_server) -> None:
-    """CASE 403-text: `Forbidden` em texto puro vira `[{message: 'Forbidden'}]`."""
-    stub_server.route("POST", "/api/document", web.Response(text="Forbidden", status=403))
+    """CASE 403-text: `Forbidden` em texto puro, com espaço em volta, vira `[{message: 'Forbidden'}]`."""
+    stub_server.route("POST", "/api/document", web.Response(text="  Forbidden\n", status=403))
 
     with pytest.raises(KonectyMetaBulkError) as caught:
         await _client(stub_server).apply_meta_bulk([ITEM])
@@ -185,3 +187,30 @@ async def test_create_service_account_omits_capabilities_when_not_given(stub_ser
     await _client(stub_server).create_service_account("X", "x")
 
     assert "capabilities" not in stub_server.requests[0]["json"]
+
+
+@pytest.mark.asyncio
+async def test_401_plain_text(stub_server) -> None:
+    """CASE 401-text: `Unauthorized` em texto puro."""
+    stub_server.route("POST", "/api/document", web.Response(text="Unauthorized", status=401))
+
+    with pytest.raises(KonectyMetaBulkError) as caught:
+        await _client(stub_server).apply_meta_bulk([ITEM])
+
+    assert caught.value.status == 401
+    assert caught.value.errors == [{"message": "Unauthorized"}]
+
+
+@pytest.mark.asyncio
+async def test_network_error_has_status_zero() -> None:
+    """CASE network: sem resposta (conexão recusada), a exceção é a mesma, com status 0."""
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    client = KonectyClient(base_url=f"http://127.0.0.1:{port}", token=FAKE_AUTH_ID)
+
+    with pytest.raises(KonectyMetaBulkError) as caught:
+        await client.apply_meta_bulk([ITEM])
+
+    assert caught.value.status == 0
+    assert caught.value.errors[0]["message"] != ""
