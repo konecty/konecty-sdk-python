@@ -86,6 +86,13 @@ def test_campo_novo_em_access_nao_exige_type(repo_cliente: Path, base_dir: Path)
     assert linter(repo_cliente, base_dir) == []
 
 
+def test_ordem_em_fields_nao_e_campo_novo(repo_cliente: Path, base_dir: Path) -> None:
+    # `"$ordem"` é marcador do patch (ordem das chaves), não campo: não pode cair na regra de
+    # campo novo sem `type` nem em nenhuma outra.
+    escrever(repo_cliente, "delta/Product/document.json", {"fields": {"novo": {"type": "text"}, "$ordem": ["novo"]}})
+    assert linter(repo_cliente, base_dir) == []
+
+
 def test_modulo_do_cliente_com_nome_de_modulo_da_base_e_conflito(repo_cliente: Path, base_dir: Path) -> None:
     escrever(repo_cliente, "modulos/Opportunity/document.json", {"_id": "Opportunity", "type": "document"})
     assert regras(linter(repo_cliente, base_dir)) == [("erro", "conflito-base", "modulos/Opportunity")]

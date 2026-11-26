@@ -122,3 +122,75 @@ def test_propriedade_ida_e_volta_inclusive_com_null_em_valor(semente: int) -> No
 )
 def test_ida_e_volta_nos_casos_de_null(a: dict, b: dict) -> None:
     assert aplicar_patch(a, gerar_patch(a, b)) == b
+
+
+# --------------------------------------------------------------------------- ordem das chaves
+# Merge Patch (RFC 7386) não guarda ordem: o resultado segue a do alvo e a chave nova vai para o
+# fim. No Konecty a ordem de objeto é comportamento (condições de filtro, colunas de lista,
+# campos): a UI percorre `filter.conditions` na ordem das chaves. Achado na migração da Aux
+# (fase 5): 119 documentos montados na ordem da base. `"$ordem": [chaves]` no objeto do patch
+# fixa a ordem do resultado.
+
+
+def _ordem(valor: Any) -> Any:
+    """A árvore com a ordem de cada objeto explícita, para comparar com ordem."""
+    if isinstance(valor, dict):
+        return [(chave, _ordem(item)) for chave, item in valor.items()]
+    if isinstance(valor, list):
+        return [_ordem(item) for item in valor]
+    return valor
+
+
+def test_ordem_reordena_o_resultado() -> None:
+    resultado = aplicar_patch({"a": 1, "b": 2, "c": 3}, {"$ordem": ["c", "a", "b"]})
+    assert list(resultado) == ["c", "a", "b"]
+    assert resultado == {"a": 1, "b": 2, "c": 3}
+
+
+def test_ordem_vale_junto_com_mudanca_e_chave_nova() -> None:
+    resultado = aplicar_patch({"a": 1, "b": 2}, {"b": 20, "z": 9, "$ordem": ["z", "b", "a"]})
+    assert _ordem(resultado) == [("z", 9), ("b", 20), ("a", 1)]
+
+
+def test_chave_fora_da_ordem_fica_no_fim_na_ordem_que_tinha() -> None:
+    resultado = aplicar_patch({"a": 1, "b": 2, "c": 3}, {"$ordem": ["c"]})
+    assert list(resultado) == ["c", "a", "b"]
+
+
+def test_ordem_com_chave_que_nao_existe_e_ignorada() -> None:
+    assert list(aplicar_patch({"a": 1, "b": 2}, {"$ordem": ["x", "b", "a"]})) == ["b", "a"]
+
+
+def test_ordem_nao_vira_chave_do_resultado() -> None:
+    assert "$ordem" not in aplicar_patch({}, {"a": {"b": 1, "$ordem": ["b"]}, "$ordem": ["a"]})["a"]
+    assert "$ordem" not in aplicar_patch({"a": 1}, {"$ordem": ["a"]})
+
+
+def test_gerar_patch_so_com_ordem_diferente_emite_ordem() -> None:
+    assert gerar_patch({"a": 1, "b": 2}, {"b": 2, "a": 1}) == {"$ordem": ["b", "a"]}
+
+
+def test_gerar_patch_de_objeto_aninhado_so_com_ordem_diferente() -> None:
+    a = {"filter": {"conditions": {"status:in": 1, "code:equals": 2}}}
+    b = {"filter": {"conditions": {"code:equals": 2, "status:in": 1}}}
+    assert gerar_patch(a, b) == {"filter": {"conditions": {"$ordem": ["code:equals", "status:in"]}}}
+
+
+def test_gerar_patch_sem_ordem_quando_o_merge_ja_da_a_ordem() -> None:
+    assert gerar_patch({"a": 1}, {"a": 1, "b": 2}) == {"b": 2}
+    assert gerar_patch({"a": 1, "b": 2}, {"a": 1, "b": 3}) == {"b": 3}
+    assert gerar_patch({"a": 1, "b": 2}, {"a": 1, "b": 2}) == {}
+
+
+def test_gerar_patch_com_chave_nova_fora_do_fim_emite_ordem() -> None:
+    assert gerar_patch({"a": 1, "c": 3}, {"a": 1, "b": 2, "c": 3}) == {"b": 2, "$ordem": ["a", "b", "c"]}
+
+
+@pytest.mark.parametrize("semente", range(300))
+def test_propriedade_ida_e_volta_guarda_a_ordem(semente: int) -> None:
+    rng = random.Random(semente)
+    a, b = _objeto(rng), _objeto(rng)
+    chaves = list(b)
+    rng.shuffle(chaves)
+    b = {chave: b[chave] for chave in chaves}
+    assert _ordem(aplicar_patch(a, gerar_patch(a, b))) == _ordem(b)
