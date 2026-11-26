@@ -5,9 +5,12 @@ Mirrors the backend's `src/server/routes/api/admin/credentials.ts` and
 requires an admin session — a regular user gets 403.
 """
 
-from typing import Any, Dict, List, Optional
+import json
+from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import quote
 
+from ..exceptions import KonectyMetaBulkError
+from ..http import request_raw
 from .base import BaseService
 
 ADMIN_PATS_PATH = "/api/admin/pats"
@@ -15,12 +18,46 @@ ADMIN_LEGACY_TOKENS_PATH = "/api/admin/legacy-tokens"
 ADMIN_SERVICE_ACCOUNTS_PATH = "/api/admin/service-accounts"
 ADMIN_MCP_ACCESS_PATH = "/api/admin/mcp-access"
 ADMIN_META_PATH = "/api/admin/meta"
+META_BULK_PATH = "/api/document"
+
+HookMode = Literal["preserve", "replace"]
 
 #: `409` — o deployment carrega metadados de um diretório (`METADATA_DIR`); nada é gravável.
 META_ADMIN_CONFIG_READ_ONLY_CODE = "meta-admin-config-read-only"
 
 #: `403` — a rota exige sessão first-party; PAT e token OAuth são recusados.
 ADMIN_ROUTES_REQUIRE_SESSION_CODE = "admin-credential-routes-require-session"
+
+
+def _meta_bulk_errors(status: int, text: str) -> List[Dict[str, Any]]:
+    """
+    Normaliza o corpo de erro de ``POST /api/document`` numa lista ``[{message, code?}]``.
+
+    A ordem importa e é a mesma do ``toBulkErrors`` no SDK TypeScript: ``errors`` primeiro, depois
+    ``message`` (o 413 do Fastify traz ``error`` **e** ``message``, e o útil é o ``message`` com o
+    ``code``), depois ``error``, depois o texto cru.
+    """
+    try:
+        body: Any = json.loads(text) if text else None
+    except ValueError:
+        body = None
+
+    if isinstance(body, dict):
+        errors = body.get("errors")
+        if isinstance(errors, list) and len(errors) > 0:
+            return errors
+        message = body.get("message")
+        if isinstance(message, str) and message:
+            error: Dict[str, Any] = {"message": message}
+            if isinstance(body.get("code"), str):
+                error["code"] = body["code"]
+            return [error]
+        if isinstance(body.get("error"), str) and body["error"]:
+            return [{"message": body["error"]}]
+
+    if body is None and text.strip():
+        return [{"message": text.strip()}]
+    return [{"message": str(status)}]
 
 
 def _segment(value: str) -> str:
@@ -67,9 +104,15 @@ class AdminService(BaseService):
         name: str,
         username: str,
         access_map: Optional[Dict[str, str]] = None,
+        *,
+        capabilities: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
-        POST /api/admin/service-accounts. Wire body: {name, username, accessMap?}.
+        POST /api/admin/service-accounts. Wire body: {name, username, accessMap?, capabilities?}.
+
+        `capabilities` grants the account something beyond its access map; today the backend only
+        knows `metaApply` (apply metadata through `apply_meta_bulk` without data access). An unknown
+        capability is refused with 400 and nothing is created. Omitted from the body when `None`.
 
         `access_map` maps document name -> 'read' | 'readWrite'; when omitted the
         `accessMap` key itself is left out of the request body (matching the TS SDK,
@@ -81,6 +124,8 @@ class AdminService(BaseService):
         payload: Dict[str, Any] = {"name": name, "username": username}
         if access_map is not None:
             payload["accessMap"] = access_map
+        if capabilities is not None:
+            payload["capabilities"] = capabilities
         return await self._post(ADMIN_SERVICE_ACCOUNTS_PATH, json=payload)
 
     async def list_service_accounts(self) -> Dict[str, Any]:
@@ -239,3 +284,47 @@ class AdminService(BaseService):
         reescreve nem apaga versão anterior.
         """
         return await self._post(f"{ADMIN_META_PATH}/{_segment(meta_id)}/rollback", json={"version": version})
+
+    async def apply_meta_bulk(
+        self,
+        items: List[Dict[str, Any]],
+        *,
+        delete_removed: Optional[bool] = None,
+        dry_run: Optional[bool] = None,
+        hook_mode: Optional[HookMode] = None,
+        namespace_patch: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        POST /api/document — aplica um lote de metadados numa transação.
+
+        Wire body: ``{items, deleteRemoved?, dryRun?, hookMode?, namespacePatch?}``; opção ``None``
+        fica fora do corpo e o servidor usa o padrão (``deleteRemoved`` falso, ``hookMode``
+        ``'preserve'``).
+
+        Returns o corpo da rota, **sem** envelope ``{success, data}``: ``{applied, created, updated,
+        deleted, warnings, preservedHooks}``, mais ``plan: {created, updated: [{_id, keys}],
+        unchanged, hooksRemoved}`` quando ``dry_run=True`` (nada é gravado).
+
+        Aceita sessão ou PAT de admin, ou PAT de service account criada com
+        ``capabilities=["metaApply"]``. Recusas, todas como :class:`KonectyMetaBulkError` com
+        ``status`` e ``errors``: 400 (item inválido, opção com tipo errado, ``dry_run`` ou
+        ``namespace_patch`` junto com ``delete_removed``), 401, 403, 413 (corpo acima de 16 MiB)
+        e 5xx.
+
+        Paridade: ``applyMetaBulk`` no SDK TypeScript; ``tests/test_meta_bulk.py`` e
+        ``src/__test__/api/adminMetaBulk.test.ts`` usam a mesma tabela de casos.
+        """
+        payload: Dict[str, Any] = {"items": items}
+        if delete_removed is not None:
+            payload["deleteRemoved"] = delete_removed
+        if dry_run is not None:
+            payload["dryRun"] = dry_run
+        if hook_mode is not None:
+            payload["hookMode"] = hook_mode
+        if namespace_patch is not None:
+            payload["namespacePatch"] = namespace_patch
+
+        status, text = await request_raw(self._client, "POST", META_BULK_PATH, json=payload)
+        if status >= 400:
+            raise KonectyMetaBulkError(status, _meta_bulk_errors(status, text))
+        return json.loads(text)

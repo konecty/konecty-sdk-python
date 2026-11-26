@@ -70,6 +70,8 @@ From **KonectySdkPython.lib.types** only: KonectyUpdateId (for update/delete ids
 | change_user_count_inactive     | yes   | module, ids                                                   | dict                                 |
 | change_user_remove_inactive    | yes   | module, ids                                                   | dict                                 |
 | change_user_set_queue          | yes   | module, ids, queue                                            | dict                                 |
+| apply_meta_bulk                | yes   | items, delete_removed?, dry_run?, hook_mode?, namespace_patch? | dict (raises KonectyMetaBulkError)  |
+| create_service_account         | yes   | name, username, access_map?, capabilities?                    | dict                                 |
 | execute_query_json             | yes   | body, include_total?, include_meta?                           | QueryResult (.stream, .total, .meta) |
 | execute_query_sql              | yes   | sql, include_total?, include_meta?                            | QueryResult                          |
 | list_saved_queries             | yes   |                                                               | dict                                 |
