@@ -47,6 +47,23 @@ async def test_dry_run_sends_only_given_options_and_returns_plan(stub_server) ->
 
 
 @pytest.mark.asyncio
+async def test_dry_run_with_namespace_patch_returns_namespace_keys(stub_server) -> None:
+    """CASE dry-run-namespace: namespacePatch vai com dryRun e plan.namespace volta como veio."""
+    patch = {"metadataVersion": {"cliente": "auxiliadora", "versaoCliente": "v1.2.0"}}
+    plan = {"created": [], "updated": [], "unchanged": 1, "hooksRemoved": {}, "namespace": {"keys": ["metadataVersion"]}}
+    stub_server.route(
+        "POST",
+        "/api/document",
+        {"applied": 0, "created": 0, "updated": 0, "deleted": 0, "warnings": [], "preservedHooks": {}, "plan": plan},
+    )
+
+    result = await _client(stub_server).apply_meta_bulk([ITEM], dry_run=True, namespace_patch=patch)
+
+    assert stub_server.requests[0]["json"] == {"items": [ITEM], "dryRun": True, "namespacePatch": patch}
+    assert result["plan"]["namespace"]["keys"] == ["metadataVersion"]
+
+
+@pytest.mark.asyncio
 async def test_options_map_to_camel_case_body(stub_server) -> None:
     """CASE options: delete_removed, hook_mode e namespace_patch viram deleteRemoved, hookMode e namespacePatch."""
     stub_server.route(
