@@ -85,12 +85,14 @@ async def test_grava_metadata_version_e_o_namespace_do_artefato(konecty: Konecty
         "base": "base-metas/v1.0.0",
         "sha256": manifesto["sha256Total"],
         "ambiente": "dev",
+    }
+    assert patch["metadataAplicacao"] == {
         "aplicadoEm": "2026-11-26T12:00:00Z",
         "aplicadoPor": "sa-metas",
         "origem": "abc123",
     }
     namespace = json.loads((artefato / "namespace.json").read_text("utf-8"))
-    assert {k: v for k, v in patch.items() if k != "metadataVersion"} == namespace
+    assert {k: v for k, v in patch.items() if k not in ("metadataVersion", "metadataAplicacao")} == namespace
     assert not {"_id", "type", "ns"} & set(patch)
 
 
@@ -130,16 +132,30 @@ async def test_plano_vazio_com_versao_ausente_grava_so_a_versao(konecty: Konecty
 
 
 @pytest.mark.asyncio
-async def test_plano_vazio_com_versao_ilegivel_nao_escreve(
-    konecty: KonectyFalso, artefato: Path, caplog: pytest.LogCaptureFixture
+async def test_dry_run_leva_o_namespace_patch_sem_os_campos_da_aplicacao(
+    konecty: KonectyFalso, artefato: Path
 ) -> None:
-    konecty.metas = dict(itens(artefato))
-    konecty.status_leitura_namespace = 403
-    with caplog.at_level(logging.WARNING):
-        resultado = await aplicar(artefato, client(konecty), tenant_env="dev", dormir=Relogio())
+    """AD-MBD-003: o PAT não lê o Namespace; quem diz se a versão muda é o `plan.namespace` do dryRun."""
+    await aplicar(artefato, client(konecty), tenant_env="dev", origem="abc123", dormir=Relogio())
+    simulado = konecty.simulacoes[0]["namespacePatch"]
+    namespace = json.loads((artefato / "namespace.json").read_text("utf-8"))
+    assert {k: v for k, v in simulado.items() if k != "metadataVersion"} == namespace
+    assert set(simulado["metadataVersion"]) == {"cliente", "versaoCliente", "base", "sha256", "ambiente"}
+    assert not [r for r in konecty.requisicoes if r["path"].startswith("/api/admin/")]
+
+
+@pytest.mark.asyncio
+async def test_so_o_namespace_mudou_grava_o_namespace(konecty: KonectyFalso, artefato: Path) -> None:
+    await aplicar(artefato, client(konecty), tenant_env="dev", dormir=Relogio())
+    konecty.namespace["siteUrl"] = "https://mudado-a-mao.invalid"
+
+    resultado = await aplicar(artefato, client(konecty), tenant_env="dev", dormir=Relogio())
+
     assert resultado.aplicados == 0
-    assert konecty.escritas == []
-    assert "ilegível" in caplog.text
+    assert resultado.versao_gravada is True
+    assert len(konecty.escritas) == 2
+    namespace = json.loads((artefato / "namespace.json").read_text("utf-8"))
+    assert konecty.namespace["siteUrl"] == namespace["siteUrl"]
 
 
 # ------------------------------------------------------------------ AC 3: 400
@@ -289,7 +305,6 @@ async def test_token_nunca_aparece_no_log_nem_no_erro(
     with caplog.at_level(logging.DEBUG):
         konecty.falhas = [503]
         await aplicar(artefato, client(konecty), tenant_env="dev", dormir=Relogio())
-        konecty.status_leitura_namespace = 401
         konecty.erros_de_schema = [{"index": 0, "path": "x", "message": "bad"}]
         with pytest.raises(LoteRecusadoError) as erro:
             await aplicar(artefato, client(konecty), tenant_env="dev", dormir=Relogio())

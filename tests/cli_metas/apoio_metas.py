@@ -58,7 +58,6 @@ class KonectyFalso:
         self.namespace: Dict[str, Any] = {"_id": "Namespace", "type": "namespace", "ns": "acme"}
         self.requisicoes: List[Dict[str, Any]] = []
         self.falhas: List[int] = []
-        self.status_leitura_namespace = 200
         self.erros_de_schema: Optional[List[Dict[str, Any]]] = None
         self.preserved_hooks: Dict[str, List[str]] = {}
         self.app = web.Application()
@@ -80,10 +79,9 @@ class KonectyFalso:
         )
         if request.path == "/rest/auth/info":
             return web.json_response({"logged": True, "user": {"_id": "sa-metas"}})
-        if request.path == "/api/admin/meta/Namespace":
-            if self.status_leitura_namespace != 200:
-                return web.Response(text="Unauthorized", status=self.status_leitura_namespace)
-            return web.json_response({"success": True, "data": [self.namespace]})
+        if request.path.startswith("/api/admin/meta/"):
+            # Como o core: as rotas de admin de meta recusam o PAT da service account.
+            return web.Response(text="Unauthorized", status=401)
         if request.path != "/api/document" or request.method != "POST":
             return web.Response(status=404)
         if self.falhas:
@@ -95,7 +93,7 @@ class KonectyFalso:
         if self.erros_de_schema is not None:
             return web.json_response({"errors": self.erros_de_schema}, status=400)
         if corpo.get("dryRun"):
-            return web.json_response(self._plano(itens, corpo.get("hookMode")))
+            return web.json_response(self._plano(itens, corpo.get("hookMode"), corpo.get("namespacePatch")))
         for item in itens:
             self.metas[item["_id"]] = item
         if corpo.get("namespacePatch"):
@@ -104,7 +102,9 @@ class KonectyFalso:
             {"applied": len(itens), "created": 0, "updated": 0, "deleted": 0, "warnings": [], "preservedHooks": self.preserved_hooks}
         )
 
-    def _plano(self, itens: List[Dict[str, Any]], hook_mode: Optional[str]) -> Dict[str, Any]:
+    def _plano(
+        self, itens: List[Dict[str, Any]], hook_mode: Optional[str], namespace_patch: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         plano: Dict[str, Any] = {"created": [], "updated": [], "unchanged": 0, "hooksRemoved": {}}
         for item in itens:
             atual = self.metas.get(item["_id"])
@@ -119,4 +119,9 @@ class KonectyFalso:
             removidos = [h for h in HOOKS if atual.get(h) is not None and item.get(h) is None]
             if removidos and hook_mode == "replace":
                 plano["hooksRemoved"][item["_id"]] = removidos
+        if namespace_patch is not None:
+            # Como o core (applyBulk.ts): as chaves do patch cujo valor difere do Namespace gravado.
+            plano["namespace"] = {
+                "keys": sorted(k for k, v in namespace_patch.items() if self.namespace.get(k) != v)
+            }
         return {"applied": 0, "created": 0, "updated": 0, "deleted": 0, "warnings": [], "preservedHooks": {}, "plan": plano}
