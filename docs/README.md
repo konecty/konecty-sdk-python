@@ -4,11 +4,12 @@ Este diretório contém a documentação técnica do SDK Python para integraçã
 
 ## Propósito do SDK
 
-O Konecty SDK Python expõe um cliente para interagir com a API REST do Konecty (CRM / plataforma de negócios) e uma CLI para operações com o banco de dados de metadados (apply, backup, pull).
+O Konecty SDK Python expõe um cliente para interagir com a API REST do Konecty (CRM / plataforma de negócios) e uma CLI para metadados: operações com o banco (apply, backup, pull) e o `konecty-cli metas`, que monta e aplica metadado de base + delta pela API.
 
 ## Índice
 
 - [api](api.md) — Contrato da API Konecty utilizada pelo SDK: endpoints, autenticação, parâmetros de find, formatos de requisição e resposta.
+- [cli-metas](cli-metas.md) — `konecty-cli metas`: montar, gerar-delta, linter, diff, aplicar e deriva de metadado base + delta.
 - [development](development.md) — Ambiente de desenvolvimento, estrutura do pacote, build e variáveis de ambiente.
 - [changelog](changelog/README.md) — Histórico de alterações do projeto.
 - [adr](adr/) — Architecture Decision Records para decisões relevantes de arquitetura (ex.: 0001-estrutura-documentacao).

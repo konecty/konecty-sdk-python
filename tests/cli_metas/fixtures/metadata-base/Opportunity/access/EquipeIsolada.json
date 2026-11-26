@@ -1,0 +1,76 @@
+{
+  "_id": "Opportunity:access:EquipeIsolada",
+  "document": "Opportunity",
+  "name": "EquipeIsolada",
+  "type": "access",
+  "label": {
+    "en": "Isolated Team",
+    "pt_BR": "Equipe Isolada"
+  },
+  "isReadable": true,
+  "isCreatable": true,
+  "isUpdatable": true,
+  "isDeletable": false,
+  "fieldDefaults": {
+    "isReadable": true,
+    "isCreatable": true,
+    "isUpdatable": true,
+    "isDeletable": false
+  },
+  "fields": {
+    "group": {
+      "CREATE": {
+        "allow": true,
+        "condition": {
+          "term": "group._id",
+          "operator": "in",
+          "value": "$allgroups"
+        }
+      },
+      "UPDATE": {
+        "allow": false
+      }
+    },
+    "_user": {
+      "UPDATE": {
+        "allow": false
+      }
+    }
+  },
+  "readFilter": {
+    "match": "and",
+    "conditions": [
+      {
+        "term": "group._id",
+        "operator": "in",
+        "value": "$allgroups"
+      }
+    ]
+  },
+  "updateFilter": {
+    "match": "and",
+    "conditions": [
+      {
+        "term": "group._id",
+        "operator": "in",
+        "value": "$allgroups"
+      }
+    ]
+  },
+  "changeUser": false,
+  "replaceUser": false,
+  "changeUserFilter": {
+    "match": "and",
+    "conditions": [
+      {
+        "term": "group._id",
+        "operator": "in",
+        "value": "$allgroups"
+      }
+    ]
+  },
+  "export": {},
+  "namespace": [
+    "base"
+  ]
+}

@@ -15,12 +15,14 @@ def cli():
 # Import commands after cli group is defined to avoid circular imports
 from .apply import apply_command
 from .backup import backup_command
+from .metas.comandos import metas_group
 from .pull import pull_command
 
 # Add commands to the group
 cli.add_command(apply_command)
 cli.add_command(backup_command)
 cli.add_command(pull_command)
+cli.add_command(metas_group)
 
 
 def main():

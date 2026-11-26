@@ -15,7 +15,7 @@ This skill summarizes the Konecty SDK Python so the agent can correctly use its 
 ## What the SDK provides
 
 - **REST client** for the [Konecty](https://github.com/konecty/Konecty) CRM API: find, get by id, create, update, delete, get document/schema, get settings, count, file upload; plus find_stream, count_stream, download_file, download_image, export_list, get_kpi, get_graph, get_pivot, comments, subscriptions, notifications, change_user, execute_query_json, execute_query_sql, saved queries (list/get/create/update/delete/share).
-- **CLI** `konecty-cli`: apply, backup, pull (metadata operations against MongoDB; not a substitute for the REST client).
+- **CLI** `konecty-cli`: apply, backup, pull (metadata operations against MongoDB; not a substitute for the REST client), and `metas` (base + delta metadata per client, applied through the API).
 - **Types and filters**: Pydantic models for Konecty data (datetime, lookup, phone, email, etc.) and filter/sort builders for find queries. Feature types: KpiConfig, CrossModuleQuery/CrossModuleRelation (lib.feature_types).
 
 ## Environment
@@ -107,7 +107,9 @@ Example flow: build `KonectyFilter`, wrap in `KonectyFindParams(filter=..., limi
 - **backup** — Backup metadata from MongoDB.
 - **pull** — Pull metadata from Konecty (API) or MongoDB. Uses `--mongo-url`, `--database`; for API, Konecty URL and token must be configured.
 
-CLI operates on the metadata database (MongoDB), not on the REST data API. For CRUD on business data, use KonectyClient.
+- **metas** — Base + delta metadata per client (no MongoDB): `montar` (build the artifact `itens.json`/`namespace.json`/`manifesto.json` from `metadados.yaml` + `delta/` + `modulos/` + `env/<ambiente>.env`), `gerar-delta` (migrate a full copy to delta), `linter`, `diff [--markdown]`, `aplicar` (sha256 + `TENANT_ENV` guard, dryRun, apply only what changed with `hookMode: 'replace'` + `namespacePatch` with `metadataVersion`; whether the Namespace changes comes from the dryRun's `plan.namespace.keys`, since a PAT can't read it, retry 5/15/45 s; token from `KONECTY_TOKEN`, never logged) and `deriva` (dryRun only; prints `konecty_metadata_drift_documents{tenant=...} N`). Python only; it uses `apply_meta_bulk`. Details in `docs/cli-metas.md`.
+
+apply/backup/pull operate on the metadata database (MongoDB), not on the REST data API; `metas aplicar`/`deriva` go through `POST /api/document`. For CRUD on business data, use KonectyClient.
 
 ## API endpoints (reference)
 
