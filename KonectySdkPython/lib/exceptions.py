@@ -1,6 +1,6 @@
 """Exceptions for the Konecty SDK."""
 
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 
 class KonectyError(Exception):
@@ -49,6 +49,35 @@ class KonectyImpersonateError(KonectyAPIError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+class KonectyMetaBulkError(KonectyAPIError):
+    """
+    Raised by ``apply_meta_bulk`` when ``POST /api/document`` answers 4xx/5xx.
+
+    Carries the HTTP ``status`` and ``errors`` as a list of ``{message, code?, ...}``. The route
+    answers in four shapes and every one of them becomes this list:
+
+    - ``{"errors": [...]}`` (item fails the schema, or the lot is refused): kept as is.
+    - Fastify's ``{"statusCode", "code", "error", "message"}`` (413 above 16 MiB): ``[{message, code}]``.
+    - ``{"error": "..."}`` (option with a wrong type, empty ``items``): ``[{message}]``.
+    - plain text (``Unauthorized``, ``Forbidden``, ``Internal server error``): ``[{message: text}]``.
+
+    An empty body becomes ``[{message: "<status>"}]``. A request that gets no answer at all (connection
+    refused, DNS, timeout) raises this error with ``status`` 0, like the TypeScript SDK's ``status: 0``,
+    so a retry can catch one exception. Subclasses KonectyAPIError so existing
+    ``except KonectyAPIError`` keeps working.
+
+    Mirrors ``applyMetaBulk``'s ``{success: false, status, errors}`` in the TypeScript SDK
+    (``src/sdk/domains/adminMetaBulk.ts``) — keep both in sync.
+    """
+
+    def __init__(self, status: int, errors: List[Dict[str, Any]]) -> None:
+        super().__init__(
+            "; ".join(str(error.get("message", "")) if isinstance(error, dict) else str(error) for error in errors)
+        )
+        self.status = status
+        self.errors = errors
 
 
 #: Código devolvido pelo Konecty quando a requisição pede ordenação arbitrária

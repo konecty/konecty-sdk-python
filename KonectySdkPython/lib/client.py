@@ -597,13 +597,41 @@ class KonectyClient:
         name: str,
         username: str,
         access_map: Optional[Dict[str, str]] = None,
+        *,
+        capabilities: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Admin: create a Service Account with a sovereign access map (POST /api/admin/service-accounts).
 
-        `access_map` maps document name -> 'read' | 'readWrite'.
+        `access_map` maps document name -> 'read' | 'readWrite'. `capabilities=["metaApply"]` lets
+        the account call `apply_meta_bulk` without data access.
         """
-        return await self._admin.create_service_account(name, username, access_map)
+        return await self._admin.create_service_account(
+            name, username, access_map, capabilities=capabilities
+        )
+
+    async def apply_meta_bulk(
+        self,
+        items: List[Dict[str, Any]],
+        *,
+        delete_removed: Optional[bool] = None,
+        dry_run: Optional[bool] = None,
+        hook_mode: Optional[Literal["preserve", "replace"]] = None,
+        namespace_patch: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Admin ou SA com `metaApply`: aplica um lote de metadados numa transação (POST /api/document).
+
+        `dry_run=True` devolve `plan` sem gravar. Erros sobem como `KonectyMetaBulkError` com
+        `status` e `errors`. Ver `AdminService.apply_meta_bulk`.
+        """
+        return await self._admin.apply_meta_bulk(
+            items,
+            delete_removed=delete_removed,
+            dry_run=dry_run,
+            hook_mode=hook_mode,
+            namespace_patch=namespace_patch,
+        )
 
     async def list_meta_documents(self) -> Dict[str, Any]:
         """Admin: os documentos de metadado do namespace (GET /api/admin/meta)."""

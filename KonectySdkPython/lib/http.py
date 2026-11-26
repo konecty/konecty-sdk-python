@@ -1,7 +1,7 @@
 """HTTP helpers for Konecty API requests. Used by KonectyClient and services."""
 
 import logging
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import aiohttp
 
@@ -36,6 +36,28 @@ class StreamResponse:
     async def __aexit__(self, *args: Any) -> None:
         await self._response.release()
         await self._session.close()
+
+
+async def request_raw(
+    client: Any,
+    method: str,
+    path: str,
+    *,
+    json: Optional[Dict[str, Any]] = None,
+) -> Tuple[int, str]:
+    """
+    Perform an HTTP request and return ``(status, body text)`` without raising on 4xx/5xx.
+
+    For routes that answer errors in shapes ``request`` cannot read, like a plain-text ``Forbidden``
+    from ``POST /api/document``. The caller parses the body and decides what to raise.
+    """
+    url = f"{client.base_url.rstrip('/')}{path}"
+    kwargs: Dict[str, Any] = {"headers": client.headers}
+    if json is not None:
+        kwargs["json"] = json
+
+    async with aiohttp.ClientSession() as session, session.request(method, url, **kwargs) as response:
+        return response.status, await response.text()
 
 
 async def request(
